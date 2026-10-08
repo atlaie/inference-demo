@@ -1,6 +1,7 @@
 import base64
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -18,7 +19,7 @@ BASE_ROOT = "bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5"
 
 def settings(adapter_name: str | None = "dbe_adapter") -> Settings:
     return Settings(base_dir=Path(f"/tinfoil/mpk/mpk-{BASE_ROOT}"), base_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-                    base_ref="TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+                    base_ref="TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6", base_schema=2,
                     adapter_name=adapter_name, owner_public_key="00" * 32 if adapter_name else None,
                     sampling=SAMPLING, signing_key_path=Path("/nonexistent"), allow_dev_key=True,
                     adapter_dir=Path("/tmp/adapter"), max_adapter_bytes=1 << 20, vllm_args=[], port=8080)
@@ -51,6 +52,13 @@ def test_pipeline_names_the_base_by_its_mount_and_revision():
     assert aliases == {"modelwrap/2": BASE_ROOT, "hf-revision/1": settings().base_ref}
     assert [m["role"] for m in pipeline["models"]] == ["base", "adapter"]
     assert pipeline["config"][0]["enforced"] is True
+
+
+def test_a_schema_1_pack_is_named_as_such_and_matches_on_the_rest(receipt):
+    pipeline = serving_pipeline(replace(settings(), base_schema=1), receipt_model(receipt, "base")["digest"], None)
+    assert {a["scheme"] for a in pipeline["models"][0]["alsoKnownAs"]} == {"modelwrap/1", "hf-revision/1"}
+    rows = {row["id"]: row for row in compare(receipt, build_statement(pipeline, {}))}
+    assert set(rows["base"]["on"]) == {"dirhash-sha256/1", "hf-revision/1"}
 
 
 def test_everything_the_eval_ran_matches(receipt):

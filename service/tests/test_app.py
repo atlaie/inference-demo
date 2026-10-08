@@ -51,7 +51,7 @@ def settings(tmp_path: Path, owner) -> Settings:
     base = tmp_path / "mpk-base"
     base.mkdir()
     (base / "config.json").write_bytes(b"{}")
-    return Settings(base_dir=base, base_name="base-model", base_ref=None, adapter_name="dbe_adapter",
+    return Settings(base_dir=base, base_name="base-model", base_ref=None, base_schema=2, adapter_name="dbe_adapter",
                     owner_public_key=owner.public_key().public_bytes_raw().hex(), sampling=SAMPLING,
                     signing_key_path=tmp_path / "no-key.pem", allow_dev_key=True, adapter_dir=tmp_path / "adapter",
                     max_adapter_bytes=1 << 20, vllm_args=[], port=8080)

@@ -254,6 +254,34 @@ links point (`http://localhost:5173` by default).
 
 Service tests: `cd service && uv run pytest`.
 
+## Deploying
+
+The enclave's measured config lives in its own repo, `sg-ai-safety-hub/inference-demo-config`, whose
+README is the deployment runbook: the image, the owner's key, the base pack on the host, the
+release, the deployment, the adapter upload and the UI. The image is built from `service/` by this
+repo's `.github/workflows/inference-demo-image.yml`, which also attests its build provenance, so the
+digest the config pins traces back to this source.
+
+## Demoing the UI
+
+The UI is static once built, but it isn't hosted anywhere yet. Ways to show it:
+
+- **Locally, against the deployed enclave** (what the runbook ends with): the dev server in Docker
+  proxies to the enclave, and the browser verifies the enclave itself with `tinfoil-js`. Nothing to
+  host; the presenter runs it and shares their screen.
+- **From the enclave itself**: easy to add (the service serves the built files, same origin, no
+  CORS), but the party being checked would serve the page that does the checking, the browser runs
+  that page before it has verified anything, and every change to the UI's text would be a new
+  measured release. Better kept apart.
+- **From a static host later**, such as GitHub Pages, or the registry's own site, which as the
+  neutral party is where the checking page belongs: build the app, allow its origin in the config's
+  `shim.origins` (CORS), and have the app call the enclave directly instead of through the dev server.
+
+For a demo, what the panel catches is as telling as the green checks: restart the enclave and the
+chat waits for the owner's adapter; upload another adapter (signed by the owner) and the panel shows
+**Private adapter differs**; ask for another temperature (`curl` with `"temperature": 0`) and the
+enclave refuses it.
+
 ## The base pack
 
 `crosswalk.py` packs a public revision with modelwrap, extracts the pack and hashes its files as
@@ -267,7 +295,6 @@ The packer container writes its downloads and packs (about 3× the model size) u
 
 ## Not yet
 
-- The config repo and the Tinfoil deployment.
-- Serving the built UI from somewhere other than the dev server, which needs either a proxy like the
-  dev server's or CORS on the enclave.
+- The first deployment, following the config repo's runbook.
+- Serving the built UI from somewhere other than the dev server (see "Demoing the UI").
 - Reading the receipt from the registry instead of the fixture.

@@ -29,7 +29,6 @@ from sash_inference.settings import ATTESTED_KEY_ID, Settings
 STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
 PREDICATE_TYPE = "https://www.aisafety.sg/fourpillars/InferenceStatement/v0.1"
 PAYLOAD_TYPE = "application/vnd.in-toto+json"
-MODELWRAP = "modelwrap/2"
 HF_REVISION = "hf-revision/1"
 MPK_MOUNT_PREFIX = "mpk-"  # Tinfoil mounts a pack at /tinfoil/mpk/mpk-<root hash>
 
@@ -129,7 +128,8 @@ def serving_pipeline(settings: Settings, base_dirhash: str, adapter_dirhash: str
     if settings.base_ref:
         base_aliases.append({"scheme": HF_REVISION, "ref": settings.base_ref})
     if settings.base_dir.name.startswith(MPK_MOUNT_PREFIX):  # the config pins this root hash
-        base_aliases.append({"scheme": MODELWRAP, "ref": settings.base_dir.name.removeprefix(MPK_MOUNT_PREFIX)})
+        base_aliases.append({"scheme": f"modelwrap/{settings.base_schema}",
+                             "ref": settings.base_dir.name.removeprefix(MPK_MOUNT_PREFIX)})
     models = [{"id": "base", "role": "base", "name": settings.base_name, "scheme": DIRHASH,
                "digest": base_dirhash, "alsoKnownAs": base_aliases}]
     applies_to = ["base"]

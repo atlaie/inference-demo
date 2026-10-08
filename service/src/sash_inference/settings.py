@@ -29,6 +29,7 @@ class Settings:
     base_dir: Path  # the base weights, mounted read-only: /tinfoil/mpk/mpk-<root hash> in the enclave
     base_name: str  # the name the receipt gives the base, e.g. TinyLlama/TinyLlama-1.1B-Chat-v1.0
     base_ref: str | None  # its Hugging Face repo@revision, if it has one
+    base_schema: int  # the modelwrap pack schema the base was packed with: its root hash is modelwrap/<schema>
     adapter_name: str | None  # None: no adapter, the base is the served model
     owner_public_key: str | None  # Ed25519, 64 hex: the only key whose approval loads an adapter
     sampling: dict  # the eval's sampling params, as the receipt records them
@@ -65,6 +66,7 @@ def load_settings(env=os.environ) -> Settings:
         base_dir=Path(required("BASE_MODEL_DIR")),
         base_name=required("BASE_MODEL_NAME"),
         base_ref=env.get("BASE_MODEL_REF") or None,
+        base_schema=int(env.get("BASE_MODEL_SCHEMA") or 2),
         adapter_name=adapter_name,
         owner_public_key=owner_public_key if adapter_name else None,
         sampling=sampling,
