@@ -9,7 +9,12 @@ const maxTokens = receipt.predicate.evalPipeline.config.find((c) => c.id === 'sa
 const SUGGESTIONS = ['What is a hardware enclave?', 'Explain model evaluations in one paragraph.',
                      'Write a haiku about trust.']
 
-export function Chat({ enclave, verified }: { enclave: Enclave; verified: boolean }) {
+export function Chat({ enclave, verified, checkBoot, onFailure }: {
+  enclave: Enclave
+  verified: boolean
+  checkBoot: (boot: string | null) => Promise<boolean> // true: the enclave restarted, the statement was fetched again
+  onFailure: () => void
+}) {
   const [messages, setMessages] = useState<Message[]>([])
   const [draft, setDraft] = useState('')
   const [streaming, setStreaming] = useState(false)
@@ -35,11 +40,16 @@ export function Chat({ enclave, verified }: { enclave: Enclave; verified: boolea
       setMessages((current) => [...current.slice(0, -1), change(current[current.length - 1])])
     try {
       const finishReason = await streamChat(enclave.model, history,
-        (delta) => update((last) => ({ ...last, content: last.content + delta })), abort.current.signal)
+        (delta) => update((last) => ({ ...last, content: last.content + delta })),
+        async (boot) => {
+          if (await checkBoot(boot)) update((last) => ({ ...last, restarted: true }))
+        },
+        abort.current.signal)
       update((last) => ({ ...last, finishReason }))
     } catch (e) {
       if (!(e instanceof DOMException && e.name === 'AbortError')) {
         setError(e instanceof Error ? e.message : String(e))
+        onFailure() // e.g. the enclave restarted and waits for the adapter again
         setMessages((current) => current.at(-1)?.content ? current : current.slice(0, -1))
       }
     } finally {
@@ -63,14 +73,18 @@ export function Chat({ enclave, verified }: { enclave: Enclave; verified: boolea
       <div className="flex-1 overflow-y-auto px-6">
         {empty ? (
           <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center pb-24 text-center">
-            <h1 className="text-3xl font-semibold tracking-tight">Ask the evaluated model</h1>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              {enclave.status === 'ready' && !verified ? 'Ask the model' : 'Ask the evaluated model'}
+            </h1>
             <p className="mt-3 max-w-md text-sm text-stone-500">
-              {receipt.subject[0].name.replace(/^[^/]+\//, '')}, sampled exactly as in its evaluation. The panel on the right shows how this
-              is proven.
+              {enclave.status === 'ready' && !verified
+                ? 'This enclave does not serve exactly the model that was evaluated. The panel on the right shows what differs.'
+                : <>{receipt.subject[0].name.replace(/^[^/]+\//, '')}, sampled exactly as in its evaluation. The panel on the
+                  right shows how this is proven.</>}
             </p>
             <div className="mt-8 w-full">
               <Composer draft={draft} setDraft={setDraft} onSend={send} streaming={streaming} enclave={enclave}
-                        onStop={() => abort.current?.abort()} />
+                        verified={verified} onStop={() => abort.current?.abort()} />
             </div>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {SUGGESTIONS.map((suggestion) => (
@@ -95,7 +109,7 @@ export function Chat({ enclave, verified }: { enclave: Enclave; verified: boolea
           <div className="mx-auto max-w-2xl">
             {error && <ErrorNote text={error} />}
             <Composer draft={draft} setDraft={setDraft} onSend={send} streaming={streaming} enclave={enclave}
-                      onStop={() => abort.current?.abort()} />
+                      verified={verified} onStop={() => abort.current?.abort()} />
           </div>
         </div>
       )}
@@ -112,21 +126,22 @@ function StatusPill({ enclave, verified }: { enclave: Enclave; verified: boolean
     </span>
   if (enclave.status === 'ready')
     return <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700">
-      <CircleAlert className="size-4" /> Partly matches the eval
+      <CircleAlert className="size-4" /> Differs from the eval
     </span>
   return <span className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-500">
     <LoaderCircle className="size-4 animate-spin" />
-    {enclave.status === 'unverified' ? 'Not verified' : enclave.status === 'unreachable' ? 'Enclave unreachable' : 'Verifying'}
+    {enclave.status === 'unverified' ? 'Not verified' : enclave.status === 'unreachable' ? 'Enclave unreachable'
+      : enclave.status === 'waiting' ? 'Waiting for the model' : 'Verifying'}
   </span>
 }
 
-function Composer({ draft, setDraft, onSend, onStop, streaming, enclave }: {
+function Composer({ draft, setDraft, onSend, onStop, streaming, enclave, verified }: {
   draft: string; setDraft: (value: string) => void; onSend: (text: string) => void; onStop: () => void
-  streaming: boolean; enclave: Enclave
+  streaming: boolean; enclave: Enclave; verified: boolean
 }) {
   const ready = enclave.status === 'ready'
   const sampling = receipt.predicate.evalPipeline.config.find((c) => c.id === 'sampling')?.params ?? {}
-  const placeholder = ready ? 'Message the evaluated model…'
+  const placeholder = ready ? (verified ? 'Message the evaluated model…' : 'Message the model…')
     : enclave.status === 'waiting' ? "Waiting for the model owner's adapter…"
     : enclave.status === 'unverified' ? 'The enclave failed verification' : 'Connecting to the enclave…'
   return (
@@ -177,6 +192,9 @@ function Bubble({ message, pending }: { message: Message; pending: boolean }) {
           {message.content}
           {pending && <span className="ml-0.5 inline-block h-4 w-1.5 translate-y-0.5 animate-pulse bg-stone-400" />}
         </div>
+        {message.restarted && (
+          <p className="mt-2 text-xs text-amber-700">The enclave restarted before this answer; the panel now describes the one that wrote it.</p>
+        )}
         {message.finishReason === 'length' && (
           <p className="mt-2 text-xs text-stone-400">Stopped at the evaluated limit of {String(maxTokens)} tokens.</p>
         )}

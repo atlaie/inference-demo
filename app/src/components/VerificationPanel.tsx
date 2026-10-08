@@ -12,7 +12,7 @@ type Status = 'ok' | 'warn' | 'fail' | 'pending'
 // One check in the list: a plain statement with its key word in bold, a boxed check, and details.
 type Check = { id: string; icon: LucideIcon; lead: string; key: string; status: Status; details: ReactNode }
 
-export function VerificationPanel({ enclave }: { enclave: Enclave }) {
+export function VerificationPanel({ enclave, verified }: { enclave: Enclave; verified: boolean }) {
   return (
     <aside className="flex w-[420px] shrink-0 flex-col border-l border-stone-200 bg-white">
       <header className="flex items-center gap-3 border-b border-stone-100 px-5 py-4">
@@ -26,7 +26,7 @@ export function VerificationPanel({ enclave }: { enclave: Enclave }) {
       </header>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-        <Intro enclave={enclave} />
+        <Intro enclave={enclave} verified={verified} />
         {checks(enclave).map((check) => <CheckRow key={check.id} check={check} />)}
         <Results />
       </div>
@@ -34,16 +34,19 @@ export function VerificationPanel({ enclave }: { enclave: Enclave }) {
   )
 }
 
-function Intro({ enclave }: { enclave: Enclave }) {
+function Intro({ enclave, verified }: { enclave: Enclave; verified: boolean }) {
   const ran = new Date(receipt.predicate.execution.finishedAt)
   const text = enclave.status === 'unverified'
     ? `The enclave failed verification, so this chat is not trusted: ${enclave.reason}.`
     : enclave.status === 'unreachable'
     ? `The enclave can't be reached: ${enclave.reason}.`
     : enclave.status === 'waiting'
-      ? `The enclave is up, but not serving yet: ${enclave.reason}.`
-      : 'This chat runs the model that was evaluated, inside a secure enclave: the same weights and the same ' +
-        'settings, checked against the eval in the registry.'
+      ? enclave.reason.includes('starting') ? 'The enclave is up and loading the model.'
+        : "The enclave is up, but serves nothing until the model owner uploads their adapter."
+      : enclave.status === 'ready' && !verified
+        ? 'This chat runs inside a secure enclave, but not the model that was evaluated: see which checks fail below.'
+        : 'This chat runs the model that was evaluated, inside a secure enclave: the same weights and the same ' +
+          'settings, checked against the eval in the registry.'
   return (
     <div className="rounded-2xl border border-stone-200 p-4">
       <p className="text-[15px] leading-relaxed">{text}</p>
@@ -96,10 +99,12 @@ function checks(enclave: Enclave): Check[] {
                 ? 'The enclave hashed the weights it loaded and signed the result. The signature checks out in your browser.'
                 : ready ? "The enclave's signature does not verify." : 'Waiting for the enclave’s signed statement.'}</p> })
 
-  const verification = ready ? enclave.signed.verification : null
+  // Known before the statement: tinfoil-js verifies the enclave first.
+  const verification = ready ? enclave.signed.verification : enclave.status === 'waiting' ? enclave.verification : null
   const attested = verification?.securityVerified === true
+  const known = ready || enclave.status === 'waiting'  // connected: verified, or plainly the local twin
   list.push({ id: 'attested', icon: Cpu, lead: 'Hardware', key: attested ? 'attested' : 'not attested',
-              status: enclave.status === 'unverified' ? 'fail' : !ready ? 'pending' : attested ? 'ok' : verification ? 'fail' : 'warn',
+              status: enclave.status === 'unverified' ? 'fail' : !known ? 'pending' : attested ? 'ok' : verification ? 'fail' : 'warn',
               details: enclave.status === 'unverified' ? <p>{enclave.reason}</p>
                 : attested && verification ? <>
                   <p>Your browser checked the enclave's AMD SEV-SNP report, and that it runs the release Sigstore
@@ -120,7 +125,7 @@ function checks(enclave: Enclave): Check[] {
                   {receipt.predicate.execution.attestation.referenceValue.tag}).</p>
                 {classifier && <p className="mt-1.5">Answers were graded by {classifier.name}, which is part of the eval only.</p>}
               </> })
-  return list
+  return list.map((check) => (check.status === 'pending' ? { ...check, key: 'pending' } : check))
 }
 
 const STATUS: Record<Status, { icon: LucideIcon; style: string }> = {

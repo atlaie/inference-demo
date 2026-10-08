@@ -172,7 +172,7 @@ def create_app(settings: Settings, upstream: httpx.AsyncClient | None = None, la
     @app.post("/v1/statement")
     async def statement():
         if state.envelope is None:
-            return error(503, "no statement yet: the model is not ready")
+            return error(503, "waiting for the model owner's adapter" if state.vllm_ready else "the model is starting")
         return {"envelope": state.envelope, "publicKey": raw_public_key(state.key).hex()}
 
     return app

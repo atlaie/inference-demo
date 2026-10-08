@@ -1,19 +1,27 @@
 // Streaming chat with the enclave's one model. The request carries no sampling fields: the service
 // applies the eval's. It goes over the same connection as the statement (enclave.ts).
 
-import { connect } from './enclave'
+import { boot, connect } from './enclave'
 
-export type Message = { role: 'user' | 'assistant'; content: string; finishReason?: string }
+export type Message = {
+  role: 'user' | 'assistant'
+  content: string
+  finishReason?: string
+  restarted?: boolean // the enclave restarted before this answer, and the statement was checked again
+}
 
+/** Streams an answer. `onResponse` runs before any of it is read, with the boot the answer comes from. */
 export async function streamChat(model: string, messages: Message[], onDelta: (text: string) => void,
+                                 onResponse: (boot: string | null) => Promise<void>,
                                  signal?: AbortSignal): Promise<string | undefined> {
-  const { fetch } = await connect()
-  const response = await fetch('/v1/chat/completions', {
+  const connection = await connect()
+  const response = await connection.fetch('/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ model, stream: true, messages: messages.map(({ role, content }) => ({ role, content })) }),
     signal,
   })
+  await onResponse(boot(connection))
   if (!response.ok || !response.body) {
     const detail = await response.json().catch(() => ({}))
     throw new Error(detail.error ?? `the enclave answered HTTP ${response.status}`)

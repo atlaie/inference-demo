@@ -67,9 +67,16 @@ attestation once, and every request then goes over EHBP to the HPKE key that att
 only that enclave can read a request and only it can produce a response the browser accepts. The
 statement and the chat answers come over that one channel: an answer the browser accepts comes from
 the enclave whose statement it checked, and that enclave's measured code serves only the stated
-weights with the stated sampling. The key is made at each boot, and the adapter can only change with
-a restart, so a statement can't outlive the adapter it names: after a restart the browser verifies
-again and fetches the new one.
+weights with the stated sampling.
+
+The enclave's keys are made at each boot, and the adapter can only change with a restart, so the key
+also says which statement applies. After a restart the old key stops working; `tinfoil-js` verifies
+the enclave again and retries the request, and its verification document then carries the new key.
+The UI compares the key each answer came over with the key the statement came over, before showing
+the answer; when they differ, it fetches the new boot's statement first and notes the restart on the
+answer. So every answer is shown with the statement of the boot that wrote it, with no polling. The
+UI only fetches the statement every few seconds while the enclave isn't serving yet, and against the
+twin, which has no keys.
 
 This binds answers for the user in the browser, not for a third party later: answers aren't signed
 one by one. The local twin has none of it: plain HTTP, no attestation.
@@ -164,6 +171,7 @@ about the weights and the sampling, not identical completions.
 
 | Path | Contents |
 |---|---|
+| `DEMO.md` | The demo runbook: preparing, the script, and what to say |
 | `app/` | The chat UI with our verification panel (Vite, React, Tailwind); `vite.mock.ts` is a stand-in enclave for UI work |
 | `service/` | The enclave service (`sash_inference`) and the owner's tool (`sash_inference.owner`), with tests and a `Dockerfile` |
 | `container/compose.yaml` | A local twin of the enclave |
@@ -171,6 +179,7 @@ about the weights and the sampling, not identical completions.
 | `fixtures/crosswalk.json` | The TinyLlama base's identities, from `crosswalk.py` |
 | `fixtures/receipt-v3.json` | OpenMined's example receipt/v3: `notebooks/enclave/double-blind-eval-w-receipts/receipt.json` on PySyft's `dev` at `37e8834f` |
 | `fixtures/statement-local.json` | A `/v1/statement` response from the local twin, signed with its dev key: what the mock serves |
+| `fixtures/statement-altered-adapter.json` | The same, after uploading the demo adapter with `lora_alpha` 16: the mock's `altered-adapter` state |
 
 The enclave's `tinfoil-config.yml` lives in its own repo: Tinfoil's SDKs verify against that repo's
 latest GitHub release, so it can't share releases with the registry. It pins the service image, the
@@ -191,7 +200,8 @@ MOCK=1 npx pnpm@11.27.0 dev   # http://localhost:5174
 ```
 
 Without Node, in Docker: `docker compose -f demo/inference/app/compose.yaml up`. With `MOCK=0` it
-talks to the twin instead.
+talks to the twin instead. Other mock states: `MOCK=waiting` (no adapter uploaded yet) and
+`MOCK=altered-adapter` (another adapter than the eval's).
 
 ### The UI against a Tinfoil enclave
 
@@ -277,10 +287,8 @@ The UI is static once built, but it isn't hosted anywhere yet. Ways to show it:
   neutral party is where the checking page belongs: build the app, allow its origin in the config's
   `shim.origins` (CORS), and have the app call the enclave directly instead of through the dev server.
 
-For a demo, what the panel catches is as telling as the green checks: restart the enclave and the
-chat waits for the owner's adapter; upload another adapter (signed by the owner) and the panel shows
-**Private adapter differs**; ask for another temperature (`curl` with `"temperature": 0`) and the
-enclave refuses it.
+`DEMO.md` is the demo's script, including what the panel catches: an outsider's upload, another
+adapter than the eval's, another temperature.
 
 ## The base pack
 

@@ -5,7 +5,7 @@
 
 import type { VerificationDocument } from 'tinfoil'
 import type { Pipeline } from './compare'
-import { connect } from './enclave'
+import { boot, connect } from './enclave'
 
 export type Statement = {
   subject: { name: string; digest: { sha256: string } }[]
@@ -22,24 +22,36 @@ export type SignedStatement = {
   signatureValid: boolean
   publicKey: string
   verification: VerificationDocument | null // the enclave's attestation, as tinfoil-js verified it
+  boot: string | null // the enclave boot it came from (enclave.ts)
 }
 
-export class NotReady extends Error {}
+/** The enclave is up but has no statement yet; it may already be verified. */
+export class NotReady extends Error {
+  readonly verification: VerificationDocument | null
+
+  constructor(message: string, verification: VerificationDocument | null) {
+    super(message)
+    this.verification = verification
+  }
+}
 
 const PAYLOAD_TYPE = 'application/vnd.in-toto+json'
 
 export async function fetchStatement(): Promise<SignedStatement> {
-  const { fetch, verification } = await connect()
-  const response = await fetch('/v1/statement', {
+  const connection = await connect()
+  const response = await connection.fetch('/v1/statement', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
   })
-  if (response.status === 503) throw new NotReady((await response.json()).error)
+  // Read after the request: if the enclave restarted, tinfoil-js has verified it again by now.
+  const verification = connection.verification()
+  if (response.status === 503) throw new NotReady((await response.json()).error, verification)
   if (!response.ok) throw new Error(`the enclave answered HTTP ${response.status}`)
   const { envelope, publicKey } = await response.json()
   const payload = base64Bytes(envelope.payload)
   const signatureValid = await verifyEd25519(publicKey, base64Bytes(envelope.signatures[0].sig),
                                              pae(envelope.payloadType, payload))
-  return { statement: JSON.parse(new TextDecoder().decode(payload)), signatureValid, publicKey, verification }
+  return { statement: JSON.parse(new TextDecoder().decode(payload)), signatureValid, publicKey, verification,
+           boot: boot(connection) }
 }
 
 /** DSSE pre-authentication encoding. */
