@@ -1,0 +1,72 @@
+# The verified inference demo's enclave: TinyLlama plus a private adapter, behind the service from
+# sg-ai-safety-hub/double-blind-eval-registry (demo/inference/service). Everything in this file is
+# measured: the browser and the model owner verify an enclave against this repo's latest release.
+# Field reference: https://docs.tinfoil.sh/containers/configuration
+#
+# Before the first release, replace the two placeholders below:
+#   the image digest       from the "Inference demo image" workflow in the registry repo
+#   MODEL_OWNER_PUBKEY     from `python -m sash_inference.owner keygen` (the model owner keeps the key)
+cvm-version: 0.14.13  # 0.14.12 or later: attested keys and the attestation socket
+cpus: 4
+memory: 32768  # MiB: vLLM, the 2.2 GB base, the KV cache and the uploaded adapter (in tmpfs)
+
+# Ed25519 key that Tinfoil makes inside the enclave at boot; every v3 attestation report lists its
+# public half. The service signs its inference statement with it.
+attested-keys:
+  - id: enclave-signing-key
+    key: ed25519
+
+models:
+  # The public base, packed with modelwrap. Its files hash to the receipt's dirhash-sha256/1
+  # (d1e29a1a…); with pack schema 2 the root hash is also the receipt's modelwrap/2 alias.
+  # `tinfoil model wrap --host <host> TinyLlama/TinyLlama-1.1B-Chat-v1.0 --commit fe8a4ea…` prints the
+  # reference for the host: if its root hash is not bb6889fc…, it packed with schema 1 (436f503a…), so
+  # use its reference here and set BASE_MODEL_SCHEMA to 1 below.
+  - name: "tinyllama"
+    repo: "TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6"
+    mpk: "bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5_2202476544_b7a5ce57-f1f8-50f3-a209-e230182f951f"
+
+containers:
+  - name: "inference"
+    image: "ghcr.io/sg-ai-safety-hub/inference-demo@sha256:0000000000000000000000000000000000000000000000000000000000000000"  # placeholder
+    restart: always
+    keys: [enclave-signing-key]  # mounted at /run/tinfoil/keys/enclave-signing-key/private_key.pem
+    attestation: true  # /tinfoil/attestation.sock: the v3 report that lists the key
+    env:
+      - BASE_MODEL_DIR: "/tinfoil/mpk/mpk-bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5"
+      - BASE_MODEL_NAME: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+      - BASE_MODEL_REF: "TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6"
+      - BASE_MODEL_SCHEMA: "2"
+      - ADAPTER_NAME: "dbe_adapter"
+      # The only key whose approval loads an adapter: the model owner's. Placeholder.
+      - MODEL_OWNER_PUBKEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      # The eval's sampling, as the receipt's evalPipeline.config "sampling" params record it.
+      - SAMPLING: '{"max_new_tokens":48,"temperature":0.8,"top_k":40}'
+      - VLLM_ARGS: "--dtype bfloat16 --max-model-len 2048 --max-lora-rank 32"
+      - VLLM_CPU_KVCACHE_SPACE: "4"  # GiB
+      # Everything is local: no downloads, no usage reports.
+      - HF_HUB_OFFLINE: "1"
+      - VLLM_NO_USAGE_STATS: "1"
+      - DO_NOT_TRACK: "1"
+    tmpfs:
+      /tmp: "size=4g,mode=1777,exec"  # also holds the uploaded adapter: enclave memory only
+      /root: "size=4g,mode=0700,exec"  # vLLM's compile caches
+    shm_size: "2g"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15m
+
+shim:
+  upstream-port: 8080
+  paths:
+    - /health
+    - /v1/models
+    - /v1/chat/completions
+    - /v1/adapter
+    - /v1/statement
+  # To serve the UI from a static host instead of a local dev server, allow its origin here
+  # (CORS for browser clients; other origins are then refused):
+  # origins:
+  #   - https://sg-ai-safety-hub.github.io
