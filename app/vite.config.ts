@@ -11,7 +11,7 @@ export default defineConfig({
     // 5174, so it runs next to the registry's own UI on 5173.
     port: 5174,
     // The enclave service: the local twin (container/compose.yaml) listens on 8080.
-    proxy: process.env.MOCK === '1' ? {} : { '/v1': 'http://127.0.0.1:8080' },
+    proxy: process.env.MOCK === '1' ? {} : { '/v1': process.env.ENCLAVE_URL ?? 'http://127.0.0.1:8080' },
     // The example receipt is imported from ../fixtures.
     fs: { allow: ['..'] },
   },

@@ -1,0 +1,26 @@
+# The UI's dev server in a Node container, for machines without Node:
+#
+#   docker compose -f demo/inference/app/compose.yaml up            # mock enclave, no model needed
+#   MOCK=0 docker compose -f demo/inference/app/compose.yaml up     # the twin from container/compose.yaml
+#
+# Then open http://localhost:5174.
+name: sash-inference-ui
+services:
+  ui:
+    image: node:22@sha256:0e5f906573693feaa1e21057ebdcfdb5bd5021f050b2dc7c9deceb629c7da2a8
+    working_dir: /work/app
+    environment:
+      MOCK: ${MOCK:-1}
+      ENCLAVE_URL: http://host.docker.internal:8080  # the twin publishes 8080 on the host
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    # The store stays in the container: next to a separate node_modules volume, pnpm would put it in the repo.
+    command: sh -c "npx -y pnpm@11.27.0 install --frozen-lockfile --store-dir /tmp/pnpm-store && npx -y pnpm@11.27.0 dev --host 0.0.0.0"
+    volumes:
+      - ..:/work  # demo/inference: the app, and the fixtures it imports
+      - node_modules:/work/app/node_modules  # Linux builds, kept off the host
+    ports:
+      - 127.0.0.1:5174:5174
+
+volumes:
+  node_modules:

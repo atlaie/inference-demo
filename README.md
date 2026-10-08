@@ -43,8 +43,11 @@ service's code.
    pinned in the config), so the enclave can only read the bytes the root hash names. The service
    hashes them and starts vLLM, which listens on localhost only.
 2. **The model owner uploads the adapter.** The owner verifies the enclave with Tinfoil's SDK and sends
-   the adapter's files to `POST /v1/adapter`, encrypted to the enclave, with an Ed25519 signature over
-   the adapter's dirhash. The config pins the owner's public key (`MODEL_OWNER_PUBKEY`), so only an
+   the adapter's files to `POST /v1/adapter` with EHBP: the body is encrypted with HPKE to the
+   enclave's public key, which Tinfoil's shim makes inside the enclave at boot and the attestation
+   report binds, so only this enclave can decrypt it. With the files goes an Ed25519 signature over
+   the adapter's dirhash. (The local tool, `sash_inference.owner`, still uploads to the twin in plain
+   HTTP.) The config pins the owner's public key (`MODEL_OWNER_PUBKEY`), so only an
    adapter the owner approved is accepted, and only once per boot. The files stay in enclave memory.
    This is how PySyft's data owners get their data into the eval enclave too.
 3. **The service loads and states it.** It hashes the files, checks the approval, loads exactly those
@@ -55,6 +58,20 @@ service's code.
 5. **Chat.** Requests go through the service, which enforces the eval's sampling: a request may leave
    the sampling fields out or repeat the eval's values, and anything else that changes what is
    generated is refused.
+
+### What ties an answer to the model
+
+The same thing that ties it in Tinfoil's own chat: the channel. The browser verifies the enclave's
+attestation once, and every request then goes over EHBP to the HPKE key that attestation binds, so
+only that enclave can read a request and only it can produce a response the browser accepts. The
+statement and the chat answers come over that one channel: an answer the browser accepts comes from
+the enclave whose statement it checked, and that enclave's measured code serves only the stated
+weights with the stated sampling. The key is made at each boot, and the adapter can only change with
+a restart, so a statement can't outlive the adapter it names: after a restart the browser verifies
+again and fetches the new one.
+
+This binds answers for the user in the browser, not for a third party later: answers aren't signed
+one by one. The local twin has none of it: plain HTTP, no attestation.
 
 `POST /v1/statement` is a POST because Tinfoil's request encryption (EHBP) only authenticates the
 response to a request with a body. The statement also carries the v3 report that lists the signing
@@ -75,20 +92,57 @@ key (`keyBinding`), as receipts do, so the registry or anyone else can check it 
 Three ways work with Tinfoil. The statement, the comparison and the panel are the same for all three,
 so the demo can switch later.
 
-| | Upload (this demo) | Encrypted pack + Tinfoil's secret store | Encrypted pack + own key server |
-|---|---|---|---|
-| Infrastructure | none | none: the key is a dashboard secret | a public VM, a domain, a CA-issued certificate |
-| Who could see the adapter | only the enclave | Tinfoil: it holds the key and the pack | only the enclave |
-| Adapter pinned in the measured config | no, only in the statement | yes | yes |
-| After an enclave restart | the owner uploads again | automatic | automatic, while the key server is up |
+- **Upload** (this demo): the owner sends the adapter to the running enclave, as above.
+- **Encrypted pack + own key server**: the owner packs the adapter with modelwrap's `--encrypt`, the
+  config pins the pack (`emwp`), and at boot the owner's
+  [`keyserver`](https://github.com/tinfoilsh/keyserver) releases its key only to an enclave whose
+  attestation matches the release it pins (repo, tag and domain). Tinfoil decrypts the pack and mounts
+  it read-only with dm-verity, like the base. Tinfoil's
+  [`confidential-private-lora-demo`](https://github.com/tinfoilsh/confidential-private-lora-demo) does
+  this.
+- **Encrypted pack + Tinfoil's secret store**: the same, with the key in Tinfoil's dashboard instead
+  of a key server.
 
-The encrypted pack is modelwrap's: the owner packs the adapter with `--encrypt`, the config pins it
-(`emwp`), and Tinfoil decrypts it at boot with a key from its secret store or from the owner's
-[`keyserver`](https://github.com/tinfoilsh/keyserver), and mounts it read-only like the base. Tinfoil's
-[`confidential-private-lora-demo`](https://github.com/tinfoilsh/confidential-private-lora-demo) serves a
-private adapter that way, with a key server. An encrypted pack has the same root hash as a plain one
-of the same files, identity and schema (checked with the demo adapter), since dm-verity covers the
-plaintext. Upload needs no infrastructure and keeps the adapter from Tinfoil, as the eval does.
+An encrypted pack has the same root hash as a plain one of the same files, identity and schema, since
+dm-verity covers the plaintext (checked with the demo adapter).
+
+| | Upload (this demo) | Encrypted pack + own key server | Encrypted pack + Tinfoil's secret store |
+|---|---|---|---|
+| Infrastructure | none | a public VM, a domain, a CA-issued certificate | none: the key is a dashboard secret |
+| Who could see the adapter | only the enclave | only the enclave | Tinfoil: it holds the key and the pack |
+| Adapter pinned in the measured config | no, only named in the statement | yes | yes |
+| Which adapter a release serves, on record | no: a release pins the owner's key, not the adapter | yes, in the Sigstore-logged release | yes, in the Sigstore-logged release |
+| Who checks the adapter's bytes while it runs | the service: it hashes, then loads | the kernel: dm-verity on every read | the kernel: dm-verity on every read |
+| After an enclave restart | the owner uploads again | automatic, while the key server is up | automatic |
+
+#### Upload versus the key server
+
+Both keep the adapter's plaintext inside the enclave, serve only an adapter the owner approved, and
+lead to the same statement and the same match. They differ in where the guarantee comes from:
+
+- **Where the adapter is named.** With the key server, the adapter's root hash is in the measured
+  config, so every release says which adapter it serves, on Sigstore's public log, before it boots.
+  With upload, a release only pins whose adapter it accepts (`MODEL_OWNER_PUBKEY`); which adapter it
+  serves is attested at runtime, by the statement.
+- **What enforces the bytes.** With the key server, the kernel checks every read against the root
+  hash (dm-verity). With upload, this service hashes the files and loads exactly those; that holds
+  because its code is measured, not because the kernel enforces it.
+- **What the owner approves.** The key server releases the key to a release it pins: the owner
+  approves the code that will serve the adapter, once per release. With upload, the owner verifies
+  the enclave in Tinfoil's SDK at upload time and signs the adapter's dirhash: they approve the bytes,
+  at each boot.
+- **Changing the adapter.** With the key server, a different adapter needs a new release, visible in
+  the log. With upload, a restart and a new signed upload are enough; only the new statement shows it.
+- **Running it.** The key server must be online at every boot, on a public domain with a CA-issued
+  certificate, and must terminate TLS itself. Upload needs the owner at every restart, and nothing
+  else.
+- **Tinfoil's [model identity post](https://tinfoil.sh/blog/2026-02-03-proving-model-identity).** There,
+  the weights' root hash is part of the measurement: the key server variant follows it for the
+  adapter, as both variants do for the base. With upload, the adapter's identity rests on the
+  statement instead.
+
+Upload needs no infrastructure and keeps the adapter from Tinfoil, as the eval does, which is why the
+demo uses it.
 
 ### Matching
 
@@ -134,6 +188,9 @@ cd demo/inference/app
 npx pnpm@11.27.0 install
 MOCK=1 npx pnpm@11.27.0 dev   # http://localhost:5174
 ```
+
+Without Node, in Docker: `docker compose -f demo/inference/app/compose.yaml up`. With `MOCK=0` it
+talks to the twin instead.
 
 ### Everything
 
