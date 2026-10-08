@@ -36,7 +36,9 @@ export function VerificationPanel({ enclave }: { enclave: Enclave }) {
 
 function Intro({ enclave }: { enclave: Enclave }) {
   const ran = new Date(receipt.predicate.execution.finishedAt)
-  const text = enclave.status === 'unreachable'
+  const text = enclave.status === 'unverified'
+    ? `The enclave failed verification, so this chat is not trusted: ${enclave.reason}.`
+    : enclave.status === 'unreachable'
     ? `The enclave can't be reached: ${enclave.reason}.`
     : enclave.status === 'waiting'
       ? `The enclave is up, but not serving yet: ${enclave.reason}.`
@@ -94,12 +96,21 @@ function checks(enclave: Enclave): Check[] {
                 ? 'The enclave hashed the weights it loaded and signed the result. The signature checks out in your browser.'
                 : ready ? "The enclave's signature does not verify." : 'Waiting for the enclave’s signed statement.'}</p> })
 
-  const attested = ready && enclave.signed.statement.predicate.execution.attestation.keyBinding !== null
+  const verification = ready ? enclave.signed.verification : null
+  const attested = verification?.securityVerified === true
   list.push({ id: 'attested', icon: Cpu, lead: 'Hardware', key: attested ? 'attested' : 'not attested',
-              status: !ready ? 'pending' : attested ? 'ok' : 'warn',
-              details: <p>{attested
-                ? 'The enclave runs on AMD SEV-SNP, and its attestation report vouches for the key that signed the statement.'
-                : 'This is the local twin, which runs outside a secure enclave. On Tinfoil, the AMD SEV-SNP attestation is checked here.'}</p> })
+              status: enclave.status === 'unverified' ? 'fail' : !ready ? 'pending' : attested ? 'ok' : verification ? 'fail' : 'warn',
+              details: enclave.status === 'unverified' ? <p>{enclave.reason}</p>
+                : attested && verification ? <>
+                  <p>Your browser checked the enclave's AMD SEV-SNP report, and that it runs the release Sigstore
+                    signed for its config repo. Every request then goes encrypted to the key that report vouches for.</p>
+                  <dl className="mt-2 grid grid-cols-2 gap-2">
+                    <Tile label="Config repo" value={verification.configRepo} />
+                    <Tile label="Release" value={verification.releaseTag ?? verification.releaseDigest.slice(0, 12)} />
+                  </dl>
+                </>
+                : <p>{verification ? 'The enclave did not verify.'
+                    : 'This is the local twin or the mock, outside a secure enclave: nothing to attest. Pointed at a Tinfoil enclave, your browser verifies its AMD SEV-SNP attestation here.'}</p> })
 
   const classifier = receipt.predicate.evalPipeline.models.find((m) => m.role === 'safety_classifier')
   list.push({ id: 'registered', icon: ScrollText, lead: 'Eval', key: 'registered', status: 'ok',

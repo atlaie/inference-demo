@@ -1,9 +1,11 @@
 // The enclave's signed inference statement: fetched, its signature checked, its payload read.
 //
-// Deployed, the request goes through tinfoil-js over the channel it verified (EHBP), which is what
-// ties the statement to the enclave. Locally there is no enclave: plain fetch to the twin.
+// With an enclave, the request goes through tinfoil-js over the channel it verified (EHBP), which is
+// what ties the statement to the enclave (enclave.ts). Locally: plain fetch to the twin.
 
+import type { VerificationDocument } from 'tinfoil'
 import type { Pipeline } from './compare'
+import { connect } from './enclave'
 
 export type Statement = {
   subject: { name: string; digest: { sha256: string } }[]
@@ -15,13 +17,19 @@ export type Statement = {
   }
 }
 
-export type SignedStatement = { statement: Statement; signatureValid: boolean; publicKey: string }
+export type SignedStatement = {
+  statement: Statement
+  signatureValid: boolean
+  publicKey: string
+  verification: VerificationDocument | null // the enclave's attestation, as tinfoil-js verified it
+}
 
 export class NotReady extends Error {}
 
 const PAYLOAD_TYPE = 'application/vnd.in-toto+json'
 
 export async function fetchStatement(): Promise<SignedStatement> {
+  const { fetch, verification } = await connect()
   const response = await fetch('/v1/statement', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
   })
@@ -31,7 +39,7 @@ export async function fetchStatement(): Promise<SignedStatement> {
   const payload = base64Bytes(envelope.payload)
   const signatureValid = await verifyEd25519(publicKey, base64Bytes(envelope.signatures[0].sig),
                                              pae(envelope.payloadType, payload))
-  return { statement: JSON.parse(new TextDecoder().decode(payload)), signatureValid, publicKey }
+  return { statement: JSON.parse(new TextDecoder().decode(payload)), signatureValid, publicKey, verification }
 }
 
 /** DSSE pre-authentication encoding. */

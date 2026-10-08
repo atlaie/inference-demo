@@ -46,8 +46,9 @@ service's code.
    the adapter's files to `POST /v1/adapter` with EHBP: the body is encrypted with HPKE to the
    enclave's public key, which Tinfoil's shim makes inside the enclave at boot and the attestation
    report binds, so only this enclave can decrypt it. With the files goes an Ed25519 signature over
-   the adapter's dirhash. (The local tool, `sash_inference.owner`, still uploads to the twin in plain
-   HTTP.) The config pins the owner's public key (`MODEL_OWNER_PUBKEY`), so only an
+   the adapter's dirhash. The owner's tool, `sash_inference.owner upload --enclave <host> --repo
+   <config repo>`, verifies the enclave with Tinfoil's Python SDK and uploads over HTTPS pinned to the
+   attested TLS key; to the local twin (`--url`) it uploads in plain HTTP. The config pins the owner's public key (`MODEL_OWNER_PUBKEY`), so only an
    adapter the owner approved is accepted, and only once per boot. The files stay in enclave memory.
    This is how PySyft's data owners get their data into the eval enclave too.
 3. **The service loads and states it.** It hashes the files, checks the approval, loads exactly those
@@ -192,6 +193,20 @@ MOCK=1 npx pnpm@11.27.0 dev   # http://localhost:5174
 Without Node, in Docker: `docker compose -f demo/inference/app/compose.yaml up`. With `MOCK=0` it
 talks to the twin instead.
 
+### The UI against a Tinfoil enclave
+
+```bash
+VITE_ENCLAVE_URL=https://<host> VITE_CONFIG_REPO=<owner/repo> npx pnpm@11.27.0 dev
+```
+
+The app then goes through `tinfoil-js` (`app/src/lib/enclave.ts`): before any request it verifies
+the enclave's AMD SEV-SNP report and that it runs the measurement Sigstore-signed for the config
+repo's latest release, then encrypts every request body to the enclave's attested key (EHBP), the
+statement and the chat alike. The panel's hardware check shows that verification. The requests go to
+the page's own origin, which the dev server proxies to the enclave, so the enclave needs no CORS.
+Checked against Tinfoil's public router: the attestation verifies in the browser, and the encrypted
+requests reach it through the proxy.
+
 ### Everything
 
 Needs Docker and uv. Outside an enclave there is no attested key: the twin signs with a key it makes
@@ -232,8 +247,8 @@ cd app && npx pnpm@11.27.0 install && npx pnpm@11.27.0 dev
 ```
 
 The twin's image (`vllm/vllm-openai-cpu`) has `linux/amd64` and `linux/arm64` builds, so it also
-runs on Apple silicon; give Docker at least 8 GB of memory. Locally the UI talks to the twin with plain `fetch` and checks the statement's signature with WebCrypto. Deployed,
-it will go through `tinfoil-js`, which verifies the enclave first. Until the registry reads
+runs on Apple silicon; give Docker at least 8 GB of memory. Locally the UI talks to the twin with plain `fetch` and checks the statement's signature with
+WebCrypto; pointed at a Tinfoil enclave, it goes through `tinfoil-js` (above). Until the registry reads
 receipt/v3, the UI uses `fixtures/receipt-v3.json`; `VITE_REGISTRY_URL` sets where its registry
 links point (`http://localhost:5173` by default).
 
@@ -252,6 +267,7 @@ The packer container writes its downloads and packs (about 3× the model size) u
 
 ## Not yet
 
-- The config repo and the Tinfoil deployment, including uploading the adapter through Tinfoil's SDK.
-- In the UI: `tinfoil-js` (deployed only), whose verification feeds the panel's hardware check, and
-  reading the receipt from the registry instead of the fixture.
+- The config repo and the Tinfoil deployment.
+- Serving the built UI from somewhere other than the dev server, which needs either a proxy like the
+  dev server's or CORS on the enclave.
+- Reading the receipt from the registry instead of the fixture.

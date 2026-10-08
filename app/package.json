@@ -12,7 +12,8 @@
   "dependencies": {
     "lucide-react": "1.49.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "tinfoil": "1.2.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",

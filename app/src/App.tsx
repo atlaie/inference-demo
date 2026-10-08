@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { AttestationError, ConfigurationError } from 'tinfoil'
 import { Chat } from './components/Chat'
 import { VerificationPanel } from './components/VerificationPanel'
 import { compare, type Row } from './lib/compare'
@@ -9,6 +10,7 @@ export type Enclave =
   | { status: 'connecting' }
   | { status: 'waiting'; reason: string } // up, but not serving yet: e.g. no adapter uploaded
   | { status: 'unreachable'; reason: string }
+  | { status: 'unverified'; reason: string } // tinfoil-js could not verify the enclave
   | { status: 'ready'; signed: SignedStatement; rows: Row[]; model: string }
 
 const POLL_MS = 3000
@@ -30,7 +32,9 @@ function App() {
       } catch (e) {
         if (stopped) return
         const reason = e instanceof Error ? e.message : String(e)
-        setEnclave(e instanceof NotReady ? { status: 'waiting', reason } : { status: 'unreachable', reason })
+        setEnclave(e instanceof NotReady ? { status: 'waiting', reason }
+          : e instanceof AttestationError || e instanceof ConfigurationError ? { status: 'unverified', reason }
+          : { status: 'unreachable', reason })
       }
       timer = window.setTimeout(poll, POLL_MS)
     }

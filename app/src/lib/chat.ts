@@ -1,10 +1,13 @@
 // Streaming chat with the enclave's one model. The request carries no sampling fields: the service
-// applies the eval's.
+// applies the eval's. It goes over the same connection as the statement (enclave.ts).
+
+import { connect } from './enclave'
 
 export type Message = { role: 'user' | 'assistant'; content: string; finishReason?: string }
 
 export async function streamChat(model: string, messages: Message[], onDelta: (text: string) => void,
                                  signal?: AbortSignal): Promise<string | undefined> {
+  const { fetch } = await connect()
   const response = await fetch('/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -33,10 +36,4 @@ export async function streamChat(model: string, messages: Message[], onDelta: (t
     }
   }
   return finishReason
-}
-
-export async function servedModel(): Promise<string | undefined> {
-  const response = await fetch('/v1/models')
-  if (!response.ok) return undefined
-  return (await response.json()).data?.[0]?.id
 }

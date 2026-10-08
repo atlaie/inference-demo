@@ -14,7 +14,10 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = [
+    "pytest>=8",
+    "tinfoil==0.14.0",  # the owner tool's upload to an enclave (sash_inference.owner)
+]
 
 [build-system]
 requires = ["hatchling"]

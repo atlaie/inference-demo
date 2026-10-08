@@ -1,11 +1,13 @@
 """The model owner's side: make an approval key, and upload an approved adapter.
 
     python -m sash_inference.owner keygen owner.pem          # prints the public key for MODEL_OWNER_PUBKEY
+    python -m sash_inference.owner upload --key owner.pem --enclave <host> --repo <config repo> ./dbe_adapter
     python -m sash_inference.owner upload --key owner.pem --url http://127.0.0.1:8080 ./dbe_adapter
 
-The upload goes to a local service over plain HTTP. Uploading to a Tinfoil enclave goes through
-Tinfoil's SDK instead, which verifies the enclave and encrypts the body to it; that comes with the
-deployment.
+To an enclave (`--enclave`), the upload goes over HTTPS pinned to the enclave's attested TLS key,
+and only after Tinfoil's SDK has verified the enclave: its hardware report, and that it runs the
+measurement Sigstore-signed for the config repo's latest release. To the local twin (`--url`), it goes
+over plain HTTP: there is nothing to verify.
 """
 
 import argparse
@@ -30,17 +32,30 @@ def keygen(path: Path) -> None:
     print(key.public_key().public_bytes_raw().hex())
 
 
-def upload(key_path: Path, url: str, adapter_dir: Path) -> None:
+def enclave_client(enclave: str, repo: str) -> tuple[httpx.Client, str]:
+    """An HTTPS client pinned to the enclave's attested TLS key, made only once the enclave verifies."""
+    from tinfoil.client import SecureClient  # only uploads to an enclave need the SDK
+
+    secure = SecureClient(enclave=enclave, repo=repo, transport="tls")
+    client = secure.make_secure_http_client()  # verifies, or raises
+    document = secure.get_verification_document().to_dict()
+    print(f"verified {enclave}: {document['configRepo']} {document['releaseTag']}", file=sys.stderr)
+    return client, f"https://{enclave}"
+
+
+def upload(key_path: Path, adapter_dir: Path, url: str | None, enclave: str | None, repo: str | None) -> None:
     key = serialization.load_pem_private_key(key_path.read_bytes(), password=None)
     files = sorted(p for p in adapter_dir.iterdir() if p.is_file())
     check_names([p.name for p in files])
     dirhash = dirhash_sha256(adapter_dir, files)
     print(f"adapter dirhash-sha256/1: {dirhash}", file=sys.stderr)
+    client, base = enclave_client(enclave, repo) if enclave else (httpx.Client(), url.rstrip("/"))
     handles = [(p.name, open(p, "rb")) for p in files]
     try:
-        response = httpx.post(f"{url.rstrip('/')}/v1/adapter", timeout=600,
-                              files=[("files", (name, handle, "application/octet-stream")) for name, handle in handles],
-                              data={"signature": sign_approval(key, dirhash)})
+        with client:
+            response = client.post(f"{base}/v1/adapter", timeout=600,
+                                   files=[("files", (name, handle, "application/octet-stream")) for name, handle in handles],
+                                   data={"signature": sign_approval(key, dirhash)})
     finally:
         for _, handle in handles:
             handle.close()
@@ -56,13 +71,18 @@ def main() -> None:
     make.add_argument("path", type=Path)
     send = commands.add_parser("upload", help="approve an adapter and upload it")
     send.add_argument("--key", type=Path, required=True)
-    send.add_argument("--url", required=True)
+    target = send.add_mutually_exclusive_group(required=True)
+    target.add_argument("--enclave", help="the enclave's host, e.g. <name>.<org>.containers.tinfoil.dev")
+    target.add_argument("--url", help="the local twin, e.g. http://127.0.0.1:8080: plain HTTP, nothing verified")
+    send.add_argument("--repo", help="the enclave's config repo, owner/name (with --enclave)")
     send.add_argument("adapter_dir", type=Path)
     args = parser.parse_args()
     if args.command == "keygen":
         keygen(args.path)
+    elif args.enclave and not args.repo:
+        parser.error("--enclave needs --repo: the config repo whose release the enclave must run")
     else:
-        upload(args.key, args.url, args.adapter_dir)
+        upload(args.key, args.adapter_dir, args.url, args.enclave, args.repo)
 
 
 if __name__ == "__main__":

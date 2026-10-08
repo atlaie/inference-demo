@@ -2,6 +2,7 @@
 #
 #   docker compose -f demo/inference/app/compose.yaml up            # mock enclave, no model needed
 #   MOCK=0 docker compose -f demo/inference/app/compose.yaml up     # the twin from container/compose.yaml
+#   MOCK=0 VITE_ENCLAVE_URL=https://<host> VITE_CONFIG_REPO=<owner/repo> docker compose -f … up   # a Tinfoil enclave
 #
 # Then open http://localhost:5174.
 name: sash-inference-ui
@@ -12,6 +13,8 @@ services:
     environment:
       MOCK: ${MOCK:-1}
       ENCLAVE_URL: http://host.docker.internal:8080  # the twin publishes 8080 on the host
+      VITE_ENCLAVE_URL: ${VITE_ENCLAVE_URL:-}  # set both: verify a Tinfoil enclave with tinfoil-js
+      VITE_CONFIG_REPO: ${VITE_CONFIG_REPO:-}
     extra_hosts:
       - host.docker.internal:host-gateway
     # The store stays in the container: next to a separate node_modules volume, pnpm would put it in the repo.

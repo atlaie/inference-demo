@@ -108,15 +108,15 @@ function StatusPill({ enclave, verified }: { enclave: Enclave; verified: boolean
   if (enclave.status === 'ready' && verified)
     return <span className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium shadow-xs">
       <SquareCheck className="size-4.5 text-accent" strokeWidth={1.75} /> Verified
-      {enclave.signed.statement.predicate.execution.attestation.keyBinding === null &&
-        <span className="font-normal text-stone-400">· local</span>}
+      {!enclave.signed.verification && <span className="font-normal text-stone-400">· local</span>}
     </span>
   if (enclave.status === 'ready')
     return <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700">
       <CircleAlert className="size-4" /> Partly matches the eval
     </span>
   return <span className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-500">
-    <LoaderCircle className="size-4 animate-spin" /> {enclave.status === 'unreachable' ? 'Enclave unreachable' : 'Verifying'}
+    <LoaderCircle className="size-4 animate-spin" />
+    {enclave.status === 'unverified' ? 'Not verified' : enclave.status === 'unreachable' ? 'Enclave unreachable' : 'Verifying'}
   </span>
 }
 
@@ -127,7 +127,8 @@ function Composer({ draft, setDraft, onSend, onStop, streaming, enclave }: {
   const ready = enclave.status === 'ready'
   const sampling = receipt.predicate.evalPipeline.config.find((c) => c.id === 'sampling')?.params ?? {}
   const placeholder = ready ? 'Message the evaluated model…'
-    : enclave.status === 'waiting' ? "Waiting for the model owner's adapter…" : 'Connecting to the enclave…'
+    : enclave.status === 'waiting' ? "Waiting for the model owner's adapter…"
+    : enclave.status === 'unverified' ? 'The enclave failed verification' : 'Connecting to the enclave…'
   return (
     <div className="rounded-2xl border border-stone-200 bg-white text-left shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
       <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} disabled={!ready}
