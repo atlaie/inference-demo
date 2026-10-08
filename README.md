@@ -109,11 +109,13 @@ about the weights and the sampling, not identical completions.
 
 | Path | Contents |
 |---|---|
+| `app/` | The chat UI with our verification panel (Vite, React, Tailwind); `vite.mock.ts` is a stand-in enclave for UI work |
 | `service/` | The enclave service (`sash_inference`) and the owner's tool (`sash_inference.owner`), with tests and a `Dockerfile` |
 | `container/compose.yaml` | A local twin of the enclave |
 | `scripts/crosswalk.py` | The base pack: packs a public revision with modelwrap and prints its identities |
 | `fixtures/crosswalk.json` | The TinyLlama base's identities, from `crosswalk.py` |
 | `fixtures/receipt-v3.json` | OpenMined's example receipt/v3: `notebooks/enclave/double-blind-eval-w-receipts/receipt.json` on PySyft's `dev` at `37e8834f` |
+| `fixtures/statement-local.json` | A `/v1/statement` response from the local twin, signed with its dev key: what the mock serves |
 
 The enclave's `tinfoil-config.yml` lives in its own repo: Tinfoil's SDKs verify against that repo's
 latest GitHub release, so it can't share releases with the registry. It pins the service image, the
@@ -121,17 +123,35 @@ base pack, the owner's public key, the attested key and the service's other sett
 
 ## Run it locally
 
+### The UI alone
+
+For working on the UI: no Docker, no model. The dev server stands in for the enclave, serving
+`fixtures/statement-local.json` and a canned answer. Needs Node 22; `npx pnpm@11.27.0` runs pnpm 11
+without installing it.
+
+```bash
+cd demo/inference/app
+npx pnpm@11.27.0 install
+MOCK=1 npx pnpm@11.27.0 dev   # http://localhost:5174
+```
+
+### Everything
+
 Needs Docker and uv. Outside an enclave there is no attested key: the twin signs with a key it makes
 at startup (`ALLOW_DEV_KEY=1`), so its statements have `"keyBinding": null`.
 
 ```bash
 cd demo/inference
 
-# 1. The base pack (about 2.2 GB): pack TinyLlama with modelwrap and extract it
+# 1. The base (about 2.2 GB). On Linux: pack TinyLlama with modelwrap and extract the pack
 curl -LO https://github.com/tinfoilsh/modelwrap/releases/download/v0.3.0/modelwrap
 echo "ecdaa47f6571621268ae3e9b66040259290084bb65fb6a14ef3f3978afcfd66e  modelwrap" | sha256sum -c && chmod +x modelwrap
 uv run scripts/crosswalk.py --modelwrap ./modelwrap \
   TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6
+#    Elsewhere (modelwrap's launcher is a Linux binary): the same files, straight from Hugging Face
+BASE=~/.cache/sash-inference-demo/extracted/TinyLlama__TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6
+uvx --from huggingface_hub hf download TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+  --revision fe8a4ea1ffedaf415f4da2f062534de366a451e6 --local-dir $BASE && rm -rf $BASE/.cache
 
 # 2. The model owner's key, and the enclave twin (ready in about a minute on 4 CPUs)
 OWNER=~/.cache/sash-inference-demo/owner.pem
@@ -149,7 +169,16 @@ curl -s localhost:8080/v1/chat/completions -H 'Content-Type: application/json' \
   -d '{"model": "dbe_adapter", "messages": [{"role": "user", "content": "What is a hardware enclave?"}]}'
 curl -s -X POST localhost:8080/v1/statement -H 'Content-Type: application/json' -d '{}' > /tmp/statement.json
 uv run --project service python -m sash_inference.compare fixtures/receipt-v3.json /tmp/statement.json
+
+# 5. The UI, at http://127.0.0.1:5174 (it proxies /v1 to the twin on 8080)
+cd app && npx pnpm@11.27.0 install && npx pnpm@11.27.0 dev
 ```
+
+The twin's image (`vllm/vllm-openai-cpu`) has `linux/amd64` and `linux/arm64` builds, so it also
+runs on Apple silicon; give Docker at least 8 GB of memory. Locally the UI talks to the twin with plain `fetch` and checks the statement's signature with WebCrypto. Deployed,
+it will go through `tinfoil-js`, which verifies the enclave first. Until the registry reads
+receipt/v3, the UI uses `fixtures/receipt-v3.json`; `VITE_REGISTRY_URL` sets where its registry
+links point (`http://localhost:5173` by default).
 
 Service tests: `cd service && uv run pytest`.
 
@@ -167,4 +196,5 @@ The packer container writes its downloads and packs (about 3× the model size) u
 ## Not yet
 
 - The config repo and the Tinfoil deployment, including uploading the adapter through Tinfoil's SDK.
-- The chat app with the side panel.
+- In the UI: `tinfoil-js` (deployed only), whose verification feeds the panel's hardware check, and
+  reading the receipt from the registry instead of the fixture.

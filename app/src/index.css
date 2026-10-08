@@ -1,0 +1,21 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --color-ink: #12201f;
+  --color-accent: #0f5c55;
+  --color-accent-soft: #e3f0ee;
+}
+
+body {
+  @apply bg-[#f6f6f3] font-sans text-ink antialiased;
+}
+
+/* The faint grid behind the chat, as in Tinfoil's chat. */
+.grid-paper {
+  background-image:
+    linear-gradient(to right, rgb(0 0 0 / 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(0 0 0 / 0.035) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
