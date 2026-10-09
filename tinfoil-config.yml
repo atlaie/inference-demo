@@ -1,10 +1,10 @@
-# The verified inference demo's enclave: TinyLlama plus a private adapter, behind the service from
-# sg-ai-safety-hub/double-blind-eval-registry (demo/inference/service). Everything in this file is
-# measured: the browser and the model owner verify an enclave against this repo's latest release.
+# The verified inference demo's enclave: TinyLlama plus a private adapter, behind this repo's service
+# (service/). Everything in this file is measured: the browser and the model owner verify an enclave
+# against this repo's latest release.
 # Field reference: https://docs.tinfoil.sh/containers/configuration
 #
 # Before the first release, replace the two placeholders below:
-#   the image digest       from the "Inference demo image" workflow in the registry repo
+#   the image digest       from the "Image" workflow (.github/workflows/image.yml)
 #   MODEL_OWNER_PUBKEY     from `python -m sash_inference.owner keygen` (the model owner keeps the key)
 cvm-version: 0.14.13  # 0.14.12 or later: attested keys and the attestation socket
 cpus: 4

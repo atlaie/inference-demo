@@ -1,0 +1,31 @@
+# Local twin of the inference enclave: the service image (stock vLLM CPU plus sash_inference) with
+# the settings it will run with under tinfoil-config.yml. The base pack's extracted files (from
+# scripts/crosswalk.py) stand in for the dm-verity mount Tinfoil makes at /tinfoil/mpk/mpk-<root>.
+# Outside an enclave there is no attested key, so ALLOW_DEV_KEY=1 signs with one made at startup.
+#
+#   MODEL_OWNER_PUBKEY=<hex> docker compose -f container/compose.yaml up --build -d
+name: sash-inference-demo
+services:
+  inference:
+    build: ../service
+    # Tinfoil runs containers with a read-only root filesystem, so the twin does too.
+    read_only: true
+    tmpfs:
+      - /tmp:size=2g,exec  # also holds the uploaded adapter: memory only
+      - /root:size=2g,exec
+    shm_size: 2g
+    environment:
+      BASE_MODEL_DIR: /tinfoil/mpk/mpk-bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5
+      BASE_MODEL_NAME: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+      BASE_MODEL_REF: TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6
+      ADAPTER_NAME: dbe_adapter
+      MODEL_OWNER_PUBKEY: ${MODEL_OWNER_PUBKEY:-}  # from sash_inference.owner keygen; the service refuses to start without it
+      # The eval's sampling, as the receipt's evalPipeline.config "sampling" params record it.
+      SAMPLING: '{"max_new_tokens":48,"temperature":0.8,"top_k":40}'
+      VLLM_ARGS: --dtype bfloat16 --max-model-len 2048 --max-lora-rank 32
+      VLLM_CPU_KVCACHE_SPACE: "2"  # GiB
+      ALLOW_DEV_KEY: "1"
+    volumes:
+      - ${MODEL_DIR:-${HOME}/.cache/sash-inference-demo/extracted/TinyLlama__TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6}:/tinfoil/mpk/mpk-bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5:ro
+    ports:
+      - 127.0.0.1:8080:8080

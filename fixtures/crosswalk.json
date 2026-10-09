@@ -1,0 +1,8 @@
+[
+  {
+    "hf-revision/1": "TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6",
+    "modelwrap/2": "bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5",
+    "mpk": "bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5_2202476544_b7a5ce57-f1f8-50f3-a209-e230182f951f",
+    "dirhash-sha256/1": "d1e29a1ad2ef057d7d4ebfe3c435a43e015d8b202c8ace1719a5b1eb5b17eb15"
+  }
+]
