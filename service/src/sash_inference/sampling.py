@@ -7,7 +7,8 @@ eval's completions were.
 """
 
 # Receipt sampling param -> its chat completions request field.
-REQUEST_FIELDS = {"max_new_tokens": "max_tokens", "temperature": "temperature", "top_k": "top_k"}
+REQUEST_FIELDS = {"max_new_tokens": "max_tokens", "temperature": "temperature", "top_k": "top_k",
+                  "top_p": "top_p"}
 # Request fields that don't change what is generated.
 NEUTRAL_FIELDS = {"model", "messages", "stream", "stream_options", "seed", "user"}
 # Request fields some clients add that are dropped before forwarding: tinfoil-js adds a prompt

@@ -3,8 +3,8 @@ name = "sash-inference"
 version = "0.1.0"
 description = "The verified inference demo's enclave service: serves the evaluated model and signs what it serves"
 requires-python = ">=3.12"
-# The versions the vLLM CPU image ships (vllm/vllm-openai-cpu v0.31.0), which runs this service
-# without installing anything.
+# The versions vLLM's images ship (vllm/vllm-openai and vllm/vllm-openai-cpu v0.31.0), which run this
+# service without installing anything.
 dependencies = [
     "cryptography==50.0.2",
     "fastapi==0.136.3",

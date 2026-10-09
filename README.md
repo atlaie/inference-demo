@@ -1,7 +1,7 @@
 # Verified inference demo
 
-A chat UI on a Tinfoil enclave that serves the model an eval ran on. This is pillar 3 of Four
-Pillars: "you are talking to the audited model". A side panel, always open, shows which of the eval's
+A chat UI on a Tinfoil enclave that serves the model an eval ran on: Gemma 4 12B with a LoRA
+adapter, as OpenMined's double-blind eval ran it on a GPU enclave. This is pillar 3 of Four Pillars: "you are talking to the audited model". A side panel, always open, shows which of the eval's
 components this inference used and links to the eval's record in the Four Pillars [registry](https://github.com/sg-ai-safety-hub/double-blind-eval-registry).
 A demo only: it reads the registry and never changes it.
 
@@ -178,11 +178,14 @@ about the weights and the sampling, not identical completions.
 | `app/` | The chat UI with our verification panel (Vite, React, Tailwind); `vite.mock.ts` is a stand-in enclave for UI work |
 | `service/` | The enclave service (`sash_inference`) and the owner's tool (`sash_inference.owner`), with tests and a `Dockerfile` |
 | `container/compose.yaml` | A local twin of the enclave |
+| `scripts/mock_statements.py` | The mock's statements, built with the service's code; on the way it checks the receipt's base and adapter digests against Hugging Face |
 | `scripts/crosswalk.py` | The base pack: packs a public revision with modelwrap and prints its identities |
+| `fixtures/receipt-v3.json` | OpenMined's receipt/v3 of the eval the demo serves: Gemma 4 12B with the adapter [`sandepaAI/sandepaAI_gemma4_coder_12b`](https://huggingface.co/sandepaAI/sandepaAI_gemma4_coder_12b) at `7a21e4ac`. `notebooks/enclave/double-blind-eval-w-receipts/receipt.json` on PySyft's `demo-4pillars-v0` at `2d082728`, logged in Rekor at index 3163283364 |
+| `fixtures/receipt-v3-tinyllama.json` | An earlier OpenMined receipt/v3, of TinyLlama with another adapter: what the local twin serves. The same file on PySyft's `dev` at `37e8834f` |
+| `fixtures/statement-mock.json` | What the enclave signs after the owner's upload, from `mock_statements.py`: what the mock serves |
+| `fixtures/statement-mock-altered-adapter.json` | The same with the adapter's `lora_alpha` 8 instead of 32: the mock's `altered-adapter` state |
+| `fixtures/statement-tinyllama-twin.json` | A `/v1/statement` response from the local twin, signed with its dev key |
 | `fixtures/crosswalk.json` | The TinyLlama base's identities, from `crosswalk.py` |
-| `fixtures/receipt-v3.json` | OpenMined's example receipt/v3: `notebooks/enclave/double-blind-eval-w-receipts/receipt.json` on PySyft's `dev` at `37e8834f` |
-| `fixtures/statement-local.json` | A `/v1/statement` response from the local twin, signed with its dev key: what the mock serves |
-| `fixtures/statement-altered-adapter.json` | The same, after uploading the demo adapter with `lora_alpha` 16: the mock's `altered-adapter` state |
 
 This repo is the enclave's config repo too. Tinfoil's SDKs verify an enclave against the latest
 GitHub release of the repo that holds its `tinfoil-config.yml`, whose Sigstore-signed measurement
@@ -194,7 +197,7 @@ covers the file byte for byte. So every GitHub release here is an enclave releas
 ### The UI alone
 
 For working on the UI: no Docker, no model. The dev server stands in for the enclave, serving
-`fixtures/statement-local.json` and a canned answer. Needs Node 22; `npx pnpm@11.27.0` runs pnpm 11
+`fixtures/statement-mock.json` and a canned answer. Needs Node 22; `npx pnpm@11.27.0` runs pnpm 11
 without installing it.
 
 ```bash
@@ -203,8 +206,8 @@ npx pnpm@11.27.0 install
 MOCK=1 npx pnpm@11.27.0 dev   # http://localhost:5174
 ```
 
-Without Node, in Docker: `docker compose -f app/compose.yaml up`. With `MOCK=0` it
-talks to the twin instead. Other mock states: `MOCK=waiting` (no adapter uploaded yet) and
+Without Node, in Docker: `docker compose -f app/compose.yaml up`. With `MOCK=0 VITE_RECEIPT=tinyllama`
+it talks to the twin instead. Other mock states: `MOCK=waiting` (no adapter uploaded yet) and
 `MOCK=altered-adapter` (another adapter than the eval's).
 
 ### The UI against a Tinfoil enclave
@@ -223,8 +226,10 @@ requests reach it through the proxy.
 
 ### Everything
 
-Needs Docker and uv. Outside an enclave there is no attested key: the twin signs with a key it makes
-at startup (`ALLOW_DEV_KEY=1`), so its statements have `"keyBinding": null`.
+Needs Docker and uv. The local twin is the enclave's service on vLLM's CPU build, and serves
+TinyLlama with the adapter of an earlier OpenMined eval (`fixtures/receipt-v3-tinyllama.json`):
+Gemma 4 12B needs a GPU. Outside an enclave there is no attested key: the twin signs with a key it
+makes at startup (`ALLOW_DEV_KEY=1`), so its statements have `"keyBinding": null`.
 
 ```bash
 # 1. The base (about 2.2 GB). On Linux: pack TinyLlama with modelwrap and extract the pack
@@ -242,7 +247,7 @@ OWNER=~/.cache/sash-inference-demo/owner.pem
 uv run --project service python -m sash_inference.owner keygen $OWNER > $OWNER.pub
 MODEL_OWNER_PUBKEY=$(cat $OWNER.pub) docker compose -f container/compose.yaml up --build -d
 
-# 3. The owner uploads the adapter: the two files PySyft's model owner uploads to the eval
+# 3. The owner uploads the adapter: the two files the TinyLlama eval's model owner uploaded to it
 ADAPTER=~/.cache/sash-inference-demo/dbe_adapter && mkdir -p $ADAPTER
 for f in adapter_config.json adapter_model.safetensors; do curl -sfL -o $ADAPTER/$f \
   https://huggingface.co/zjudai/flowertune-general-nlp-lora-tinyllama-1.1b-chat-v1.0/resolve/fe3854b53ddf9870047f1eda04ea927c42f1644b/$f; done
@@ -252,48 +257,50 @@ uv run --project service python -m sash_inference.owner upload --key $OWNER --ur
 curl -s localhost:8080/v1/chat/completions -H 'Content-Type: application/json' \
   -d '{"model": "dbe_adapter", "messages": [{"role": "user", "content": "What is a hardware enclave?"}]}'
 curl -s -X POST localhost:8080/v1/statement -H 'Content-Type: application/json' -d '{}' > /tmp/statement.json
-uv run --project service python -m sash_inference.compare fixtures/receipt-v3.json /tmp/statement.json
+uv run --project service python -m sash_inference.compare fixtures/receipt-v3-tinyllama.json /tmp/statement.json
 
 # 5. The UI, at http://127.0.0.1:5174 (it proxies /v1 to the twin on 8080)
-cd app && npx pnpm@11.27.0 install && npx pnpm@11.27.0 dev
+cd app && npx pnpm@11.27.0 install && VITE_RECEIPT=tinyllama npx pnpm@11.27.0 dev
 ```
 
 The twin's image (`vllm/vllm-openai-cpu`) has `linux/amd64` and `linux/arm64` builds, so it also
 runs on Apple silicon; give Docker at least 8 GB of memory. Locally the UI talks to the twin with
 plain `fetch` and checks the statement's signature with WebCrypto; pointed at a Tinfoil enclave, it
-goes through `tinfoil-js` (above). Until the registry reads
-receipt/v3, the UI uses `fixtures/receipt-v3.json`; `VITE_REGISTRY_URL` sets where its registry
-links point (`http://localhost:5173` by default).
+goes through `tinfoil-js` (above). Until the registry reads receipt/v3, the UI uses
+`fixtures/receipt-v3.json`, or with `VITE_RECEIPT=tinyllama` the twin's; `VITE_REGISTRY_URL` sets
+where its registry links point (`http://localhost:5173` by default).
 
 Service tests: `cd service && uv run pytest`.
 
 ## Deploying
 
-Needs a Tinfoil Containers account with a host for CPU workloads on AMD SEV-SNP, the GitHub CLI,
-and, for the model owner, uv and a checkout of this repo.
+Needs a Tinfoil Containers account with a GPU host on AMD SEV-SNP (one NVIDIA GPU, as OpenMined's
+eval enclave), the GitHub CLI, and, for the model owner, uv and a checkout of this repo.
 
-1. **The image.** `gh workflow run image.yml -f tag=v0.1.0` builds `service/` and publishes it to
-   GHCR with a build provenance attestation, so the digest the config pins traces back to this
+1. **The image.** `gh workflow run image.yml -f tag=v0.1.0` builds `service/` on vLLM's CUDA image
+   and publishes it to GHCR with a build provenance attestation, so the digest the config pins traces back to this
    repo's source. Its run summary prints `ghcr.io/sg-ai-safety-hub/inference-demo@sha256:…`: put that
    into `tinfoil-config.yml`. The first time, make the GHCR package public, so Tinfoil's host can
    pull it.
 2. **The model owner's key.** The model owner makes it and keeps the private half:
    `uv run --project service python -m sash_inference.owner keygen owner.pem` prints the public key
    for `MODEL_OWNER_PUBKEY`.
-3. **The base pack on the host.**
-   `tinfoil model wrap --host <host> TinyLlama/TinyLlama-1.1B-Chat-v1.0 --commit fe8a4ea1ffedaf415f4da2f062534de366a451e6 --wait`
-   prints the pack's reference. Root hash `bb6889fc…` means pack schema 2, the receipt's: the config
-   is right as it is. Root hash `436f503a…` means schema 1: use the printed reference for `mpk` and in
-   `BASE_MODEL_DIR`, and set `BASE_MODEL_SCHEMA` to `"1"`. Either way the base still matches the eval
-   by its dirhash and its Hugging Face revision.
+3. **The base pack on the host.** The config mounts the pack OpenMined's eval mounted
+   (`970878d7…`), which they packed on `control.inf6.tinfoil.sh`. On another host,
+   `tinfoil model wrap --host <host> google/gemma-4-12B-it --commit 707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7 --wait`
+   packs it there and should print the same reference (pack schema 1, modelwrap's default). If it
+   prints another root hash, use that reference for `mpk` and in `BASE_MODEL_DIR`, and set
+   `BASE_MODEL_SCHEMA` to its schema: the base then still matches the eval by its dirhash and its
+   Hugging Face revision.
 4. **The release.** Commit the config, then `gh workflow run tinfoil-release.yml -f version=v0.0.1`.
    It tags the commit, measures the config, and publishes the measurement as a Sigstore-signed GitHub
    release.
 5. **The deployment.** In the [dashboard](https://dash.tinfoil.sh): Containers → Deploy, this repo and
    the release tag. The enclave is served at `<name>.<org>.containers.tinfoil.dev`.
 6. **The adapter.** The model owner verifies the enclave and uploads:
-   `uv run --project service python -m sash_inference.owner upload --key owner.pem --enclave <host> --repo sg-ai-safety-hub/inference-demo <adapter dir>`.
-   The enclave serves nothing until then, and needs the upload again after every restart.
+   `uv run --project service python -m sash_inference.owner upload --key owner.pem --enclave <host> --repo sg-ai-safety-hub/inference-demo <adapter dir>`,
+   with the eval's two adapter files (DEMO.md, "Before the demo"). The enclave serves nothing until
+   then, and needs the upload again after every restart.
 7. **The UI**:
    `MOCK=0 VITE_ENCLAVE_URL=https://<host> VITE_CONFIG_REPO=sg-ai-safety-hub/inference-demo docker compose -f app/compose.yaml up`,
    then http://localhost:5174.
@@ -323,10 +330,17 @@ adapter than the eval's, another temperature.
 
 ## The base pack
 
-`crosswalk.py` packs a public revision with modelwrap, extracts the pack and hashes its files as
-PySyft does. For TinyLlama it reproduces the receipt's `modelwrap/2` alias (`bb6889fc…`) and its
-`dirhash-sha256/1` (`d1e29a1a…`): the pack the config pins holds exactly the bytes the eval ran.
-Packing must pin `--schema 2`, as PySyft does; modelwrap's default schema 1 gives another root hash.
+The receipt and the statement both name the base by the files in its pack (`dirhash-sha256/1`) and
+by the pack's root hash (`modelwrap/<schema>`). The root hash depends on the pack schema as well as
+the files: OpenMined packed Gemma with schema 1, modelwrap's default, and TinyLlama with schema 2.
+
+For the eval's Gemma, `mock_statements.py` recomputes the dirhash (`9e36ef28…`) from Hugging Face's
+file hashes: the pack holds exactly the files of `google/gemma-4-12B-it@707f0a3b`. Repacking it
+takes about 3× its 24 GB, so its root hash is the one OpenMined's config pins.
+
+For the twin's TinyLlama, `crosswalk.py` packs the revision with modelwrap, extracts the pack and
+hashes its files as PySyft does. It reproduces that receipt's `modelwrap/2` alias (`bb6889fc…`) and
+its dirhash (`d1e29a1a…`).
 
 The packer container writes its downloads and packs (about 3× the model size) under
 `~/.cache/sash-inference-demo` as root; `./modelwrap --delete <repo>@<revision> --output
@@ -334,6 +348,7 @@ The packer container writes its downloads and packs (about 3× the model size) u
 
 ## Not yet
 
-- The first deployment ("Deploying").
+- The first deployment ("Deploying"), which is also the first time vLLM loads the adapter onto
+  Gemma 4: there is no GPU to try it on before.
 - Serving the built UI from somewhere other than the dev server (see "Demoing the UI").
 - Reading the receipt from the registry instead of the fixture.

@@ -85,9 +85,10 @@ function checks(enclave: Enclave): Check[] {
               status: fromRow(sampling),
               details: <>
                 <p>Every answer is sampled as in the eval{sampling?.enforced ? ', and the enclave refuses requests that ask otherwise' : ''}.</p>
-                <dl className="mt-2 grid grid-cols-3 gap-2">
+                <dl className="mt-2 grid auto-cols-fr grid-flow-col gap-2">
                   <Tile label="Temperature" value={String(params.temperature)} />
                   <Tile label="Top-k" value={String(params.top_k)} />
+                  {params.top_p !== undefined && <Tile label="Top-p" value={String(params.top_p)} />}
                   <Tile label="Max tokens" value={String(params.max_new_tokens)} />
                 </dl>
               </> })
@@ -210,8 +211,8 @@ function MetricTile({ metric, label }: { metric?: Metric; label: string }) {
 
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <div className="rounded-lg bg-stone-50 px-3 py-2">
-      <dt className="text-[11px] text-stone-500">{label}</dt>
+    <div className="rounded-lg bg-stone-50 px-2.5 py-2">
+      <dt className="whitespace-nowrap text-[11px] text-stone-500">{label}</dt>
       <dd className="text-sm font-semibold">{value}</dd>
       {note && <dd className="text-[11px] text-stone-500">{note}</dd>}
     </div>

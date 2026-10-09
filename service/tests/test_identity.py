@@ -1,6 +1,7 @@
 import hashlib
 import json
 
+import pytest
 from conftest import receipt_model
 
 from sash_inference.identity import canonical_json, dirhash_sha256, jcs_sha256
@@ -9,6 +10,24 @@ from sash_inference.identity import canonical_json, dirhash_sha256, jcs_sha256
 def test_sampling_digest_matches_the_receipt(receipt):
     sampling = next(c for c in receipt["predicate"]["evalPipeline"]["config"] if c["id"] == "sampling")
     assert jcs_sha256(sampling["params"]) == sampling["digest"]
+
+
+def test_sampling_digest_is_jcs_for_whole_floats():
+    # OpenMined's Gemma 4 receipt: top_p 1.0 is hashed as JCS writes it, `1`.
+    params = {"max_new_tokens": 48, "temperature": 0.8, "top_k": 40, "top_p": 1.0}
+    assert jcs_sha256(params) == "649e1ddd1eb9ea463643fa060b1e32677f00800c7a1dd1826ca12b72fd4ccfdc"
+
+
+@pytest.mark.parametrize("number, text", [
+    (1.0, "1"), (0.8, "0.8"), (-1.5, "-1.5"), (100.0, "100"), (0.0, "0"), (123.456, "123.456"),
+    (0.000001, "0.000001"), (1e-7, "1e-7"), (1e21, "1e+21"), (1.5e21, "1.5e+21"), (1e20, "100000000000000000000"),
+])
+def test_numbers_as_javascript_writes_them(number, text):
+    assert canonical_json(number).decode() == text
+
+
+def test_canonical_json_sorts_and_compacts():
+    assert canonical_json({"b": [1, True, None], "a": "é\n"}) == '{"a":"é\\n","b":[1,true,null]}'.encode()
 
 
 def test_dirhash_formula_matches_the_receipts_adapter(receipt):

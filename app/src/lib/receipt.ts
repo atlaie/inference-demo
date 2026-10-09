@@ -1,7 +1,11 @@
 // The eval's receipt. Until the registry reads receipt/v3 (Chris's PySyft adapter), the app uses
-// OpenMined's example receipt from ../fixtures; later this fetches it from the registry's read API.
+// OpenMined's receipts from ../fixtures; later this fetches it from the registry's read API.
+//
+// The enclave serves the Gemma 4 12B eval's model (receipt-v3.json). The local twin serves TinyLlama,
+// with an earlier eval's adapter, so against it VITE_RECEIPT=tinyllama picks that eval's receipt.
 
-import example from '../../../fixtures/receipt-v3.json'
+import gemma from '../../../fixtures/receipt-v3.json'
+import tinyllama from '../../../fixtures/receipt-v3-tinyllama.json'
 import type { Pipeline } from './compare'
 
 export type Metric = { name: string; value: number; unit?: string; n?: number; higherIsBetter?: boolean }
@@ -18,7 +22,7 @@ export type Receipt = {
   }
 }
 
-export const receipt = example as unknown as Receipt
+export const receipt = (import.meta.env.VITE_RECEIPT === 'tinyllama' ? tinyllama : gemma) as unknown as Receipt
 
 // Where the registry's UI is; the record pages are still being built.
 const REGISTRY_URL = import.meta.env.VITE_REGISTRY_URL ?? 'http://localhost:5173'

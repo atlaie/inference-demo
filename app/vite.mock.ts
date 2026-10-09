@@ -1,9 +1,10 @@
 // A stand-in for the enclave in the dev server, for working on and rehearsing the UI without Docker
 // or the model. MOCK picks what it shows:
 //
-//   MOCK=1                 the evaluated model: a statement the local twin signed (fixtures/statement-local.json)
-//   MOCK=altered-adapter   another adapter: the twin's statement after an owner-signed upload of the
-//                          demo adapter with lora_alpha 16 instead of 64 (fixtures/statement-altered-adapter.json)
+//   MOCK=1                 the evaluated model: the statement the enclave signs after the owner's upload
+//                          (fixtures/statement-mock.json, from scripts/mock_statements.py)
+//   MOCK=altered-adapter   another adapter: the same after an owner-signed upload of the eval's adapter
+//                          with lora_alpha 8 instead of 32 (fixtures/statement-mock-altered-adapter.json)
 //   MOCK=waiting           no adapter uploaded yet: the enclave serves nothing
 //
 // Chat streams a canned answer, cut off at the eval's 48 tokens as the real service would.
@@ -15,8 +16,8 @@ import type { Plugin } from 'vite'
 export const MOCK_VARIANTS = ['1', 'altered-adapter', 'waiting']
 
 const STATEMENTS: Record<string, string> = {
-  '1': '../fixtures/statement-local.json',
-  'altered-adapter': '../fixtures/statement-altered-adapter.json',
+  '1': '../fixtures/statement-mock.json',
+  'altered-adapter': '../fixtures/statement-mock-altered-adapter.json',
 }
 const ANSWER = 'A hardware enclave is an isolated region of a processor that keeps code and data encrypted ' +
   'while they are in use, so that even the operating system, the cloud provider and anyone with physical ' +

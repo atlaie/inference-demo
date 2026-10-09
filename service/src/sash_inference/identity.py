@@ -6,7 +6,9 @@ params, so tests/test_identity.py checks these against the digests in a v3 recei
 
 import hashlib
 import json
+import math
 from collections.abc import Iterable
+from decimal import Decimal
 from pathlib import Path
 
 DIRHASH = "dirhash-sha256/1"
@@ -35,6 +37,40 @@ def jcs_sha256(value) -> str:
 
 
 def canonical_json(value) -> bytes:
-    """Sorted, compact JSON. It is RFC 8785 (JCS) for what this service hashes: ASCII keys, strings,
-    integers and short decimals, so it needs no JCS library in the vLLM image."""
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    """RFC 8785 (JCS): sorted, compact JSON with numbers written as JavaScript writes them, so 1.0 is
+    `1`. For dicts of strings, as in a dirhash, that is plain sorted, compact JSON."""
+    return _jcs(value).encode()
+
+
+def _jcs(value) -> str:
+    if isinstance(value, dict):
+        items = sorted(value.items(), key=lambda item: item[0].encode("utf-16-be"))
+        return "{" + ",".join(f"{_jcs(k)}:{_jcs(v)}" for k, v in items) + "}"
+    if isinstance(value, list | tuple):
+        return "[" + ",".join(_jcs(v) for v in value) + "]"
+    if isinstance(value, float):
+        return _jcs_number(value)
+    return json.dumps(value, ensure_ascii=False)  # strings, integers, booleans, null
+
+
+def _jcs_number(x: float) -> str:
+    """ECMAScript's Number::toString, which JCS prescribes: the shortest digits that round-trip
+    (Python's repr has the same), placed as JavaScript places them."""
+    if not math.isfinite(x):
+        raise ValueError(f"JSON has no {x}")
+    if x == 0:
+        return "0"
+    sign, digit_tuple, exponent = Decimal(repr(x)).as_tuple()
+    n = len(digit_tuple) + exponent  # x = 0.d1d2… × 10^n
+    digits = "".join(map(str, digit_tuple)).rstrip("0")
+    k = len(digits)
+    if k <= n <= 21:
+        text = digits + "0" * (n - k)
+    elif 0 < n <= 21:
+        text = f"{digits[:n]}.{digits[n:]}"
+    elif -6 < n <= 0:
+        text = "0." + "0" * -n + digits
+    else:
+        mantissa = digits if k == 1 else f"{digits[0]}.{digits[1:]}"
+        text = f"{mantissa}e{'+' if n > 0 else '-'}{abs(n - 1)}"
+    return ("-" if sign else "") + text

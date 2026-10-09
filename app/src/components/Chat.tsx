@@ -157,7 +157,8 @@ function Composer({ draft, setDraft, onSend, onStop, streaming, enclave, verifie
                 className="block w-full resize-none rounded-t-2xl bg-transparent px-5 pt-4 text-[15px] outline-none placeholder:text-stone-400 disabled:cursor-not-allowed" />
       <div className="flex items-center justify-between px-4 pb-3">
         <span className="font-mono text-xs text-stone-400">
-          temperature {String(sampling.temperature)} · top-k {String(sampling.top_k)} · {String(sampling.max_new_tokens)} tokens · fixed by the eval
+          temperature {String(sampling.temperature)} · top-k {String(sampling.top_k)}
+          {sampling.top_p !== undefined && ` · top-p ${String(sampling.top_p)}`} · {String(sampling.max_new_tokens)} tokens · fixed by the eval
         </span>
         {streaming ? (
           <button onClick={onStop} title="Stop"

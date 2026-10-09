@@ -1,13 +1,18 @@
-# Local twin of the inference enclave: the service image (stock vLLM CPU plus sash_inference) with
-# the settings it will run with under tinfoil-config.yml. The base pack's extracted files (from
-# scripts/crosswalk.py) stand in for the dm-verity mount Tinfoil makes at /tinfoil/mpk/mpk-<root>.
-# Outside an enclave there is no attested key, so ALLOW_DEV_KEY=1 signs with one made at startup.
+# Local twin of the inference enclave: the service image on vLLM's CPU build, serving TinyLlama with
+# the adapter of an earlier OpenMined eval (fixtures/receipt-v3-tinyllama.json). The enclave serves
+# Gemma 4 12B on a GPU, which a laptop can't; the service and its settings are the same otherwise.
+# The base pack's extracted files (from scripts/crosswalk.py) stand in for the dm-verity mount
+# Tinfoil makes at /tinfoil/mpk/mpk-<root>. Outside an enclave there is no attested key, so
+# ALLOW_DEV_KEY=1 signs with one made at startup.
 #
 #   MODEL_OWNER_PUBKEY=<hex> docker compose -f container/compose.yaml up --build -d
 name: sash-inference-demo
 services:
   inference:
-    build: ../service
+    build:
+      context: ../service
+      args:
+        VLLM_IMAGE: vllm/vllm-openai-cpu@sha256:495c84fe30f3572b83a78100a1e8ba423dbb77fc532ecefebe114e6b77327bd9
     # Tinfoil runs containers with a read-only root filesystem, so the twin does too.
     read_only: true
     tmpfs:
@@ -20,7 +25,7 @@ services:
       BASE_MODEL_REF: TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6
       ADAPTER_NAME: dbe_adapter
       MODEL_OWNER_PUBKEY: ${MODEL_OWNER_PUBKEY:-}  # from sash_inference.owner keygen; the service refuses to start without it
-      # The eval's sampling, as the receipt's evalPipeline.config "sampling" params record it.
+      # The TinyLlama eval's sampling, as its receipt's evalPipeline.config "sampling" params record it.
       SAMPLING: '{"max_new_tokens":48,"temperature":0.8,"top_k":40}'
       VLLM_ARGS: --dtype bfloat16 --max-model-len 2048 --max-lora-rank 32
       VLLM_CPU_KVCACHE_SPACE: "2"  # GiB

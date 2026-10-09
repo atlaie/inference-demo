@@ -161,7 +161,7 @@ def test_chat_goes_to_the_adapter_with_the_eval_sampling(settings, owner, tmp_pa
         response = client.post("/v1/chat/completions", json={"model": "dbe_adapter", "messages": messages})
         assert response.status_code == 200
         assert fake.last("/v1/chat/completions") == {"model": "dbe_adapter", "messages": messages,
-                                                     "max_tokens": 48, "temperature": 0.8, "top_k": 40}
+                                                     "max_tokens": 48, "temperature": 0.8, "top_k": 40, "top_p": 1.0}
         refused = client.post("/v1/chat/completions", json={"model": "dbe_adapter", "messages": [], "temperature": 0})
         assert refused.status_code == 400
         assert client.post("/v1/chat/completions", json={"model": "base", "messages": []}).status_code == 400

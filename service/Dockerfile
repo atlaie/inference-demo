@@ -1,7 +1,9 @@
-# The inference enclave's container: stock vLLM CPU with this service in front of it.
-# Nothing is installed: the service runs on the image's own Python and packages, the versions
-# pyproject.toml pins for tests.
-FROM vllm/vllm-openai-cpu@sha256:495c84fe30f3572b83a78100a1e8ba423dbb77fc532ecefebe114e6b77327bd9
+# The inference enclave's container: stock vLLM with this service in front of it. The enclave runs
+# vLLM's CUDA build; the local twin builds this on vLLM's CPU build (container/compose.yaml).
+# Nothing is installed: the service runs on the image's own Python and packages, which both builds
+# ship in the versions pyproject.toml pins for tests.
+ARG VLLM_IMAGE=vllm/vllm-openai@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
+FROM ${VLLM_IMAGE}
 
 COPY src/sash_inference /opt/sash-inference/sash_inference
 ENV PYTHONPATH=/opt/sash-inference

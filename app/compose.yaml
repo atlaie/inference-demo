@@ -1,7 +1,7 @@
 # The UI's dev server in a Node container, for machines without Node:
 #
 #   docker compose -f app/compose.yaml up            # mock enclave, no model needed
-#   MOCK=0 docker compose -f app/compose.yaml up     # the twin from container/compose.yaml
+#   MOCK=0 VITE_RECEIPT=tinyllama docker compose -f app/compose.yaml up     # the twin from container/compose.yaml
 #   MOCK=0 VITE_ENCLAVE_URL=https://<host> VITE_CONFIG_REPO=sg-ai-safety-hub/inference-demo docker compose -f … up   # a Tinfoil enclave
 #
 # Then open http://localhost:5174.
@@ -15,6 +15,7 @@ services:
       ENCLAVE_URL: http://host.docker.internal:8080  # the twin publishes 8080 on the host
       VITE_ENCLAVE_URL: ${VITE_ENCLAVE_URL:-}  # set both: verify a Tinfoil enclave with tinfoil-js
       VITE_CONFIG_REPO: ${VITE_CONFIG_REPO:-}
+      VITE_RECEIPT: ${VITE_RECEIPT:-}  # tinyllama: the twin's eval
     extra_hosts:
       - host.docker.internal:host-gateway
     # The store stays in the container: next to a separate node_modules volume, pnpm would put it in the repo.

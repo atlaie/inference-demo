@@ -1,14 +1,17 @@
-# The verified inference demo's enclave: TinyLlama plus a private adapter, behind this repo's service
-# (service/). Everything in this file is measured: the browser and the model owner verify an enclave
+# The verified inference demo's enclave: Gemma 4 12B plus a private adapter on one GPU, behind this
+# repo's service (service/). Everything in this file is measured: the browser and the model owner verify an enclave
 # against this repo's latest release.
 # Field reference: https://docs.tinfoil.sh/containers/configuration
 #
-# Before the first release, replace the two placeholders below:
-#   the image digest       from the "Image" workflow (.github/workflows/image.yml)
-#   MODEL_OWNER_PUBKEY     from `python -m sash_inference.owner keygen` (the model owner keeps the key)
+# Before the first release, replace the image digest below, a placeholder, with the one the "Image"
+# workflow prints (.github/workflows/image.yml). MODEL_OWNER_PUBKEY is from
+# `python -m sash_inference.owner keygen`; the model owner keeps the key.
 cvm-version: 0.14.13  # 0.14.12 or later: attested keys and the attestation socket
-cpus: 4
-memory: 32768  # MiB: vLLM, the 2.2 GB base, the KV cache and the uploaded adapter (in tmpfs)
+# As OpenMined's eval enclave runs Gemma 4 12B (OpenMined/syft-enclave-tinfoil v0.1.29): the 24 GB
+# base is read twice at boot, hashed and then loaded, so memory holds it in the page cache.
+cpus: 16
+memory: 65536  # MiB
+gpus: 1
 
 # Ed25519 key that Tinfoil makes inside the enclave at boot; every v3 attestation report lists its
 # public half. The service signs its inference statement with it.
@@ -17,14 +20,13 @@ attested-keys:
     key: ed25519
 
 models:
-  # The public base, packed with modelwrap. Its files hash to the receipt's dirhash-sha256/1
-  # (d1e29a1a…); with pack schema 2 the root hash is also the receipt's modelwrap/2 alias.
-  # `tinfoil model wrap --host <host> TinyLlama/TinyLlama-1.1B-Chat-v1.0 --commit fe8a4ea…` prints the
-  # reference for the host: if its root hash is not bb6889fc…, it packed with schema 1 (436f503a…), so
-  # use its reference here and set BASE_MODEL_SCHEMA to 1 below.
-  - name: "tinyllama"
-    repo: "TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6"
-    mpk: "bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5_2202476544_b7a5ce57-f1f8-50f3-a209-e230182f951f"
+  # The public base: the same pack the eval mounted, copied from OpenMined's config. Its files hash to
+  # the receipt's dirhash-sha256/1 (9e36ef28…), and its root hash is the receipt's modelwrap/1 alias.
+  # `tinfoil model wrap --host <host> google/gemma-4-12B-it --commit 707f0a3b… --wait` packs it on
+  # another host, with the same reference (pack schema 1, modelwrap's default).
+  - name: "gemma-4-12b-it"
+    repo: "google/gemma-4-12B-it@707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7"
+    mpk: "970878d77196ed24e4bb6f12101dfe86635058a48b7e805b22b6b35da0f90724_23951781888_7ee9e48b-5c4b-511d-98ec-39af133bd041"
 
 containers:
   - name: "inference"
@@ -32,25 +34,28 @@ containers:
     restart: always
     keys: [enclave-signing-key]  # mounted at /run/tinfoil/keys/enclave-signing-key/private_key.pem
     attestation: true  # /tinfoil/attestation.sock: the v3 report that lists the key
+    # The enclave's GPU. Tinfoil requires both lines together. vLLM's CUDA image sets the NVIDIA
+    # variables itself.
+    runtime: nvidia
+    gpus: all
     env:
-      - BASE_MODEL_DIR: "/tinfoil/mpk/mpk-bb6889fc21660fe9bfa2399ac9a09c31a4e99f6b1cd0087300fe97d42dcba5e5"
-      - BASE_MODEL_NAME: "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-      - BASE_MODEL_REF: "TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6"
-      - BASE_MODEL_SCHEMA: "2"
+      - BASE_MODEL_DIR: "/tinfoil/mpk/mpk-970878d77196ed24e4bb6f12101dfe86635058a48b7e805b22b6b35da0f90724"
+      - BASE_MODEL_NAME: "google/gemma-4-12B-it"
+      - BASE_MODEL_REF: "google/gemma-4-12B-it@707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7"
+      - BASE_MODEL_SCHEMA: "1"
       - ADAPTER_NAME: "dbe_adapter"
-      # The only key whose approval loads an adapter: the model owner's. Placeholder.
-      - MODEL_OWNER_PUBKEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      # The only key whose approval loads an adapter: the model owner's.
+      - MODEL_OWNER_PUBKEY: "ee6a9a7d072560e62a06fc7bd64109de134ecebc4500cfb4c10406381959174a"
       # The eval's sampling, as the receipt's evalPipeline.config "sampling" params record it.
-      - SAMPLING: '{"max_new_tokens":48,"temperature":0.8,"top_k":40}'
-      - VLLM_ARGS: "--dtype bfloat16 --max-model-len 2048 --max-lora-rank 32"
-      - VLLM_CPU_KVCACHE_SPACE: "4"  # GiB
+      - SAMPLING: '{"max_new_tokens":48,"temperature":0.8,"top_k":40,"top_p":1.0}'
+      - VLLM_ARGS: "--dtype bfloat16 --max-model-len 8192 --max-lora-rank 16"
       # Everything is local: no downloads, no usage reports.
       - HF_HUB_OFFLINE: "1"
       - VLLM_NO_USAGE_STATS: "1"
       - DO_NOT_TRACK: "1"
     tmpfs:
       /tmp: "size=4g,mode=1777,exec"  # also holds the uploaded adapter: enclave memory only
-      /root: "size=4g,mode=0700,exec"  # vLLM's compile caches
+      /root: "size=8g,mode=0700,exec"  # vLLM's torch.compile, Triton and FlashInfer caches
     shm_size: "2g"
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]

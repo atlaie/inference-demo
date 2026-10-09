@@ -36,6 +36,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Free disk space
+        # vLLM's CUDA image is 9 GB compressed: the build downloads it to push it to GHCR, which takes
+        # more space than the runner has free.
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h /
+
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f  # v4.6.0
         with:
