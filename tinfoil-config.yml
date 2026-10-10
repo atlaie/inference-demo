@@ -3,8 +3,8 @@
 # verify an enclave against this repo's latest release.
 # Field reference: https://docs.tinfoil.sh/containers/configuration
 #
-# Before the first release, replace the image digest below, a placeholder, with the one the "Image"
-# workflow prints (.github/workflows/image.yml). MODEL_OWNER_PUBKEY is from
+# The image digest is the one the "Image" workflow prints (.github/workflows/image.yml), whose build
+# provenance ties it to this repo's source. MODEL_OWNER_PUBKEY is from
 # `python -m inference_tools.owner keygen`; the model owner keeps the key.
 cvm-version: 0.14.13  # 0.14.12 or later: attested keys and the attestation socket
 # As OpenMined's eval enclave runs Gemma 4 12B (OpenMined/syft-enclave-tinfoil v0.1.29): the 24 GB
@@ -30,7 +30,7 @@ models:
 
 containers:
   - name: "inference"
-    image: "ghcr.io/sg-ai-safety-hub/inference-demo@sha256:0000000000000000000000000000000000000000000000000000000000000000"  # placeholder
+    image: "ghcr.io/sg-ai-safety-hub/inference-demo@sha256:7ce46f5de3f4c0c52f23747b817796cee6385982371ac5fd0777a2c9da6f9468"  # v0.1.0
     restart: always
     keys: [enclave-signing-key]  # mounted at /run/tinfoil/keys/enclave-signing-key/private_key.pem
     attestation: true  # /tinfoil/attestation.sock: the v3 report that lists the key
@@ -61,7 +61,7 @@ containers:
       test: ["CMD", "curl", "-sf", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
-      start_period: 15m
+      start_period: 30m  # hashing the 24 GB base, then loading and compiling it on the GPU
 
 shim:
   upstream-port: 8080
