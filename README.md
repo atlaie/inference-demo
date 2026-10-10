@@ -174,7 +174,7 @@ about the weights and the sampling, not identical completions.
 |---|---|
 | `DEMO.md` | The demo runbook: preparing, the script, and what to say |
 | `tinfoil-config.yml` | The enclave's measured config: the service image, the base pack, the owner's public key, the attested key and the settings |
-| `.github/workflows/` | `image.yml` builds the service image; `tinfoil-release*.yml` are Tinfoil's release workflows, unchanged from [`tinfoil-containers-template`](https://github.com/tinfoilsh/tinfoil-containers-template) |
+| `.github/workflows/` | `image.yml` builds the service image; `tinfoil-release*.yml` are Tinfoil's release workflows from [`tinfoil-containers-template`](https://github.com/tinfoilsh/tinfoil-containers-template), with the measuring action that matches `cvm-version` |
 | `app/` | The chat UI with our verification panel (Vite, React, Tailwind); `vite.mock.ts` is a stand-in enclave for UI work |
 | `service/` | The enclave's service (`inference_service`): everything the enclave runs besides vLLM, with its tests and `Dockerfile` |
 | `tools/` | What runs outside the enclave: the model owner's upload tool (`inference_tools.owner`) and the comparison the panel follows (`inference_tools.compare`), with tests |
