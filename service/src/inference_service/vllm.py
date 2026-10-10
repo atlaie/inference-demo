@@ -10,7 +10,7 @@ import os
 
 import httpx
 
-from sash_inference.settings import Settings
+from inference_service.settings import Settings
 
 log = logging.getLogger(__name__)
 

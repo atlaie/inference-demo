@@ -5,16 +5,14 @@ from pathlib import Path
 
 import httpx
 import pytest
-from conftest import SAMPLING
+from conftest import SAMPLING, open_envelope, sign_approval
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 
-from sash_inference import vllm
-from sash_inference.adapter import sign_approval
-from sash_inference.app import create_app
-from sash_inference.identity import dirhash_sha256
-from sash_inference.settings import Settings
-from sash_inference.statement import open_envelope
+from inference_service import vllm
+from inference_service.app import create_app
+from inference_service.identity import dirhash_sha256
+from inference_service.settings import Settings
 
 ADAPTER_FILES = {"adapter_config.json": b'{"r": 32}', "adapter_model.safetensors": b"\x00" * 64}
 

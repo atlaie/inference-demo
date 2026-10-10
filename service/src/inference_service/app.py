@@ -26,12 +26,12 @@ from fastapi import FastAPI, Form, Request, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.background import BackgroundTask
 
-from sash_inference import vllm
-from sash_inference.adapter import APPROVAL_CONTEXT, AdapterError, NotApproved, verify_approval, write_files
-from sash_inference.identity import dirhash_sha256
-from sash_inference.sampling import SamplingError, enforce
-from sash_inference.settings import Settings
-from sash_inference.statement import (build_statement, fetch_key_binding, load_signing_key, raw_public_key,
+from inference_service import vllm
+from inference_service.adapter import APPROVAL_CONTEXT, AdapterError, NotApproved, verify_approval, write_files
+from inference_service.identity import dirhash_sha256
+from inference_service.sampling import SamplingError, enforce
+from inference_service.settings import Settings
+from inference_service.statement import (build_statement, fetch_key_binding, load_signing_key, raw_public_key,
                                       serving_pipeline, sign_envelope)
 
 log = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ def create_app(settings: Settings, upstream: httpx.AsyncClient | None = None, la
 
     @app.get("/v1/models")
     async def models():
-        data = [{"id": settings.served_model, "object": "model", "owned_by": "sash-inference"}] if state.servable else []
+        data = [{"id": settings.served_model, "object": "model", "owned_by": "inference-demo"}] if state.servable else []
         return {"object": "list", "data": data}
 
     @app.post("/v1/chat/completions")

@@ -27,7 +27,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-DEFAULT_WORK = Path.home() / ".cache" / "sash-inference-demo"
+DEFAULT_WORK = Path.home() / ".cache" / "inference-demo"
 # The schema PySyft's eval job packs with (`modelwrap --local --schema 2`). modelwrap's default is 1.
 SCHEMA = "2"
 MPK_REFERENCE = r"[0-9a-f]{64}_[0-9]+_[0-9a-f-]{36}"  # ROOTHASH_OFFSET_UUID, as tinfoil-config.yml's `mpk`

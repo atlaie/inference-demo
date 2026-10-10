@@ -19,12 +19,11 @@ import secrets
 import socket
 from pathlib import Path
 
-from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-from sash_inference.identity import DIRHASH, JCS, canonical_json, jcs_sha256
-from sash_inference.settings import ATTESTED_KEY_ID, Settings
+from inference_service.identity import DIRHASH, JCS, canonical_json, jcs_sha256
+from inference_service.settings import ATTESTED_KEY_ID, Settings
 
 STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
 PREDICATE_TYPE = "https://www.aisafety.sg/fourpillars/InferenceStatement/v0.1"
@@ -162,16 +161,3 @@ def sign_envelope(statement: dict, key: Ed25519PrivateKey) -> dict:
     signature = key.sign(pae(PAYLOAD_TYPE, payload))
     return {"payloadType": PAYLOAD_TYPE, "payload": base64.b64encode(payload).decode(),
             "signatures": [{"sig": base64.b64encode(signature).decode()}]}
-
-
-def open_envelope(envelope: dict, public_key: bytes) -> dict:
-    """The statement in `envelope`, once its one signature verifies under `public_key`."""
-    if envelope.get("payloadType") != PAYLOAD_TYPE or len(envelope.get("signatures") or []) != 1:
-        raise ValueError("not a single-signature in-toto DSSE envelope")
-    payload = base64.b64decode(envelope["payload"], validate=True)
-    signature = base64.b64decode(envelope["signatures"][0]["sig"], validate=True)
-    try:
-        Ed25519PublicKey.from_public_bytes(public_key).verify(signature, pae(PAYLOAD_TYPE, payload))
-    except InvalidSignature as e:
-        raise ValueError("the envelope's signature does not verify") from e
-    return json.loads(payload)

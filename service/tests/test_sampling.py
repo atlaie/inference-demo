@@ -1,7 +1,7 @@
 import pytest
 from conftest import SAMPLING
 
-from sash_inference.sampling import SamplingError, check_sampling, enforce
+from inference_service.sampling import SamplingError, check_sampling, enforce
 
 MESSAGES = [{"role": "user", "content": "hi"}]
 

@@ -8,7 +8,7 @@ receipt's base and adapter digests against the public revisions in seconds, with
 weights. The statements are built and signed by the service's own code, with keys made here, as the
 local twin signs them: no attestation.
 
-    uv run --project service python scripts/mock_statements.py
+    uv run --project tools python scripts/mock_statements.py
 """
 
 import hashlib
@@ -18,11 +18,12 @@ from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from sash_inference.adapter import APPROVAL_CONTEXT, sign_approval
-from sash_inference.app import State, now
-from sash_inference.identity import canonical_json
-from sash_inference.settings import load_settings
-from sash_inference.statement import raw_public_key
+from inference_service.adapter import APPROVAL_CONTEXT
+from inference_service.app import State, now
+from inference_service.identity import canonical_json
+from inference_service.settings import load_settings
+from inference_service.statement import raw_public_key
+from inference_tools.owner import sign_approval
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 BASE = ("google/gemma-4-12B-it", "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7")

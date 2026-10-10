@@ -46,7 +46,7 @@ service's code.
    the adapter's files to `POST /v1/adapter` with EHBP: the body is encrypted with HPKE to the
    enclave's public key, which Tinfoil's shim makes inside the enclave at boot and the attestation
    report binds, so only this enclave can decrypt it. With the files goes an Ed25519 signature over
-   the adapter's dirhash. The owner's tool, `sash_inference.owner upload --enclave <host> --repo
+   the adapter's dirhash. The owner's tool, `inference_tools.owner upload --enclave <host> --repo
    sg-ai-safety-hub/inference-demo`, verifies the enclave with Tinfoil's Python SDK and uploads over
    HTTPS pinned to the attested TLS key; to the local twin (`--url`) it uploads in plain HTTP. The
    config pins the owner's public key (`MODEL_OWNER_PUBKEY`), so only an adapter the owner approved is
@@ -155,7 +155,7 @@ demo uses it.
 
 ### Matching
 
-`sash_inference.compare` is the reference for what the panel shows, one row per component:
+`inference_tools.compare` is the reference for what the panel shows, one row per component:
 
 | Verdict | Meaning |
 |---|---|
@@ -176,7 +176,8 @@ about the weights and the sampling, not identical completions.
 | `tinfoil-config.yml` | The enclave's measured config: the service image, the base pack, the owner's public key, the attested key and the settings |
 | `.github/workflows/` | `image.yml` builds the service image; `tinfoil-release*.yml` are Tinfoil's release workflows, unchanged from [`tinfoil-containers-template`](https://github.com/tinfoilsh/tinfoil-containers-template) |
 | `app/` | The chat UI with our verification panel (Vite, React, Tailwind); `vite.mock.ts` is a stand-in enclave for UI work |
-| `service/` | The enclave service (`sash_inference`) and the owner's tool (`sash_inference.owner`), with tests and a `Dockerfile` |
+| `service/` | The enclave's service (`inference_service`): everything the enclave runs besides vLLM, with its tests and `Dockerfile` |
+| `tools/` | What runs outside the enclave: the model owner's upload tool (`inference_tools.owner`) and the comparison the panel follows (`inference_tools.compare`), with tests |
 | `container/compose.yaml` | A local twin of the enclave |
 | `scripts/mock_statements.py` | The mock's statements, built with the service's code; on the way it checks the receipt's base and adapter digests against Hugging Face |
 | `scripts/crosswalk.py` | The base pack: packs a public revision with modelwrap and prints its identities |
@@ -186,6 +187,11 @@ about the weights and the sampling, not identical completions.
 | `fixtures/statement-mock-altered-adapter.json` | The same with the adapter's `lora_alpha` 8 instead of 32: the mock's `altered-adapter` state |
 | `fixtures/statement-tinyllama-twin.json` | A `/v1/statement` response from the local twin, signed with its dev key |
 | `fixtures/crosswalk.json` | The TinyLlama base's identities, from `crosswalk.py` |
+
+To audit what the enclave runs: `tinfoil-config.yml` pins all of it, and the image is vLLM's
+published image plus `service/src/inference_service`, nine files and about 700 lines (the
+Dockerfile copies nothing else). What runs elsewhere, the tools, the UI and the scripts, is not
+in the image.
 
 This repo is the enclave's config repo too. Tinfoil's SDKs verify an enclave against the latest
 GitHub release of the repo that holds its `tinfoil-config.yml`, whose Sigstore-signed measurement
@@ -238,26 +244,26 @@ echo "ecdaa47f6571621268ae3e9b66040259290084bb65fb6a14ef3f3978afcfd66e  modelwra
 uv run scripts/crosswalk.py --modelwrap ./modelwrap \
   TinyLlama/TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6
 #    Elsewhere (modelwrap's launcher is a Linux binary): the same files, straight from Hugging Face
-BASE=~/.cache/sash-inference-demo/extracted/TinyLlama__TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6
+BASE=~/.cache/inference-demo/extracted/TinyLlama__TinyLlama-1.1B-Chat-v1.0@fe8a4ea1ffedaf415f4da2f062534de366a451e6
 uvx --from huggingface_hub hf download TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
   --revision fe8a4ea1ffedaf415f4da2f062534de366a451e6 --local-dir $BASE && rm -rf $BASE/.cache
 
 # 2. The model owner's key, and the enclave twin (ready in about a minute on 4 CPUs)
-OWNER=~/.cache/sash-inference-demo/owner.pem
-uv run --project service python -m sash_inference.owner keygen $OWNER > $OWNER.pub
+OWNER=~/.cache/inference-demo/owner.pem
+uv run --project tools python -m inference_tools.owner keygen $OWNER > $OWNER.pub
 MODEL_OWNER_PUBKEY=$(cat $OWNER.pub) docker compose -f container/compose.yaml up --build -d
 
 # 3. The owner uploads the adapter: the two files the TinyLlama eval's model owner uploaded to it
-ADAPTER=~/.cache/sash-inference-demo/dbe_adapter && mkdir -p $ADAPTER
+ADAPTER=~/.cache/inference-demo/dbe_adapter && mkdir -p $ADAPTER
 for f in adapter_config.json adapter_model.safetensors; do curl -sfL -o $ADAPTER/$f \
   https://huggingface.co/zjudai/flowertune-general-nlp-lora-tinyllama-1.1b-chat-v1.0/resolve/fe3854b53ddf9870047f1eda04ea927c42f1644b/$f; done
-uv run --project service python -m sash_inference.owner upload --key $OWNER --url http://127.0.0.1:8080 $ADAPTER
+uv run --project tools python -m inference_tools.owner upload --key $OWNER --url http://127.0.0.1:8080 $ADAPTER
 
 # 4. Chat, then compare the statement with the receipt
 curl -s localhost:8080/v1/chat/completions -H 'Content-Type: application/json' \
   -d '{"model": "dbe_adapter", "messages": [{"role": "user", "content": "What is a hardware enclave?"}]}'
 curl -s -X POST localhost:8080/v1/statement -H 'Content-Type: application/json' -d '{}' > /tmp/statement.json
-uv run --project service python -m sash_inference.compare fixtures/receipt-v3-tinyllama.json /tmp/statement.json
+uv run --project tools python -m inference_tools.compare fixtures/receipt-v3-tinyllama.json /tmp/statement.json
 
 # 5. The UI, at http://127.0.0.1:5174 (it proxies /v1 to the twin on 8080)
 cd app && npx pnpm@11.27.0 install && VITE_RECEIPT=tinyllama npx pnpm@11.27.0 dev
@@ -270,7 +276,7 @@ goes through `tinfoil-js` (above). Until the registry reads receipt/v3, the UI u
 `fixtures/receipt-v3.json`, or with `VITE_RECEIPT=tinyllama` the twin's; `VITE_REGISTRY_URL` sets
 where its registry links point (`http://localhost:5173` by default).
 
-Service tests: `cd service && uv run pytest`.
+Tests: `uv run --project service pytest service` and `uv run --project tools pytest tools`.
 
 ## Deploying
 
@@ -283,7 +289,7 @@ eval enclave), the GitHub CLI, and, for the model owner, uv and a checkout of th
    into `tinfoil-config.yml`. The first time, make the GHCR package public, so Tinfoil's host can
    pull it.
 2. **The model owner's key.** The model owner makes it and keeps the private half:
-   `uv run --project service python -m sash_inference.owner keygen owner.pem` prints the public key
+   `uv run --project tools python -m inference_tools.owner keygen owner.pem` prints the public key
    for `MODEL_OWNER_PUBKEY`.
 3. **The base pack on the host.** The config mounts the pack OpenMined's eval mounted
    (`970878d7…`), which they packed on `control.inf6.tinfoil.sh`. On another host,
@@ -298,7 +304,7 @@ eval enclave), the GitHub CLI, and, for the model owner, uv and a checkout of th
 5. **The deployment.** In the [dashboard](https://dash.tinfoil.sh): Containers → Deploy, this repo and
    the release tag. The enclave is served at `<name>.<org>.containers.tinfoil.dev`.
 6. **The adapter.** The model owner verifies the enclave and uploads:
-   `uv run --project service python -m sash_inference.owner upload --key owner.pem --enclave <host> --repo sg-ai-safety-hub/inference-demo <adapter dir>`,
+   `uv run --project tools python -m inference_tools.owner upload --key owner.pem --enclave <host> --repo sg-ai-safety-hub/inference-demo <adapter dir>`,
    with the eval's two adapter files (DEMO.md, "Before the demo"). The enclave serves nothing until
    then, and needs the upload again after every restart.
 7. **The UI**:
@@ -343,8 +349,8 @@ hashes its files as PySyft does. It reproduces that receipt's `modelwrap/2` alia
 its dirhash (`d1e29a1a…`).
 
 The packer container writes its downloads and packs (about 3× the model size) under
-`~/.cache/sash-inference-demo` as root; `./modelwrap --delete <repo>@<revision> --output
-~/.cache/sash-inference-demo/output --cache ~/.cache/sash-inference-demo/cache` removes them.
+`~/.cache/inference-demo` as root; `./modelwrap --delete <repo>@<revision> --output
+~/.cache/inference-demo/output --cache ~/.cache/inference-demo/cache` removes them.
 
 ## Not yet
 

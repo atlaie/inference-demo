@@ -5,6 +5,6 @@
 ARG VLLM_IMAGE=vllm/vllm-openai@sha256:c1c9f6fd5c109ba7f0546a59f5b2f15fb87f64c77782e90a27b648b42a8e67c3
 FROM ${VLLM_IMAGE}
 
-COPY src/sash_inference /opt/sash-inference/sash_inference
-ENV PYTHONPATH=/opt/sash-inference
-ENTRYPOINT ["python3", "-m", "sash_inference"]
+COPY src/inference_service /opt/inference-service/inference_service
+ENV PYTHONPATH=/opt/inference-service
+ENTRYPOINT ["python3", "-m", "inference_service"]

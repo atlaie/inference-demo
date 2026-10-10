@@ -1,11 +1,11 @@
-"""Run the service: `python -m sash_inference`. Settings come from the environment (settings.py)."""
+"""Run the service: `python -m inference_service`. Settings come from the environment (settings.py)."""
 
 import logging
 
 import uvicorn
 
-from sash_inference.app import create_app
-from sash_inference.settings import load_settings
+from inference_service.app import create_app
+from inference_service.settings import load_settings
 
 
 def main() -> None:

@@ -5,7 +5,7 @@
 #   MOCK=0 VITE_ENCLAVE_URL=https://<host> VITE_CONFIG_REPO=sg-ai-safety-hub/inference-demo docker compose -f … up   # a Tinfoil enclave
 #
 # Then open http://localhost:5174.
-name: sash-inference-ui
+name: inference-demo-ui
 services:
   ui:
     image: node:22@sha256:0e5f906573693feaa1e21057ebdcfdb5bd5021f050b2dc7c9deceb629c7da2a8

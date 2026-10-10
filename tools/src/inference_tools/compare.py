@@ -1,11 +1,12 @@
 """Compare an eval receipt with an inference statement, component by component.
 
-This is what the demo's side panel shows; it lives here as the reference the panel follows.
+This is what the demo's side panel shows (app/src/lib/compare.ts follows it), for checking a
+statement without the UI.
 
-    python -m sash_inference.compare receipt.json statement.json
+    python -m inference_tools.compare receipt.json statement.json
 
 `receipt.json` is a receipt's in-toto Statement, or its DSSE envelope (whose signature the registry
-checks, not this). `statement.json` is this service's /v1/statement response; its signature is
+checks, not this). `statement.json` is the enclave's /v1/statement response; its signature is
 checked against the key in it, which the browser gets over the channel it has verified.
 """
 
@@ -14,9 +15,25 @@ import base64
 import json
 import sys
 
-from sash_inference.statement import open_envelope
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+from inference_service.statement import PAYLOAD_TYPE, pae
 
 WEIGHT_ROLES = ("base", "adapter")
+
+
+def open_envelope(envelope: dict, public_key: bytes) -> dict:
+    """The statement in `envelope`, once its one signature verifies under `public_key`."""
+    if envelope.get("payloadType") != PAYLOAD_TYPE or len(envelope.get("signatures") or []) != 1:
+        raise ValueError("not a single-signature in-toto DSSE envelope")
+    payload = base64.b64decode(envelope["payload"], validate=True)
+    signature = base64.b64decode(envelope["signatures"][0]["sig"], validate=True)
+    try:
+        Ed25519PublicKey.from_public_bytes(public_key).verify(signature, pae(PAYLOAD_TYPE, payload))
+    except InvalidSignature as e:
+        raise ValueError("the envelope's signature does not verify") from e
+    return json.loads(payload)
 
 
 def identifiers(component: dict) -> set[tuple[str, str]]:

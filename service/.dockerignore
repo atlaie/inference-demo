@@ -1,0 +1,5 @@
+# The image gets src/inference_service and nothing else, not even bytecode from local runs.
+**/__pycache__
+.venv
+.pytest_cache
+tests

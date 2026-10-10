@@ -11,7 +11,7 @@ import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
-from sash_inference.sampling import check_sampling
+from inference_service.sampling import check_sampling
 
 # Where Tinfoil mounts the attested key the config grants this container (see `attested-keys` in
 # https://docs.tinfoil.sh/containers/attested-keys).

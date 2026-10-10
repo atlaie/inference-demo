@@ -1,4 +1,4 @@
-// The eval-vs-inference comparison: a port of sash_inference.compare, which is the reference.
+// The eval-vs-inference comparison: a port of inference_tools.compare, which is the reference.
 
 export type Alias = { scheme: string; ref?: string; digest?: string }
 

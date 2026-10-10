@@ -1,8 +1,8 @@
 """The model owner's side: make an approval key, and upload an approved adapter.
 
-    python -m sash_inference.owner keygen owner.pem          # prints the public key for MODEL_OWNER_PUBKEY
-    python -m sash_inference.owner upload --key owner.pem --enclave <host> --repo <config repo> ./dbe_adapter
-    python -m sash_inference.owner upload --key owner.pem --url http://127.0.0.1:8080 ./dbe_adapter
+    python -m inference_tools.owner keygen owner.pem          # prints the public key for MODEL_OWNER_PUBKEY
+    python -m inference_tools.owner upload --key owner.pem --enclave <host> --repo <config repo> ./dbe_adapter
+    python -m inference_tools.owner upload --key owner.pem --url http://127.0.0.1:8080 ./dbe_adapter
 
 To an enclave (`--enclave`), the upload goes over HTTPS pinned to the enclave's attested TLS key,
 and only after Tinfoil's SDK has verified the enclave: its hardware report, and that it runs the
@@ -11,6 +11,7 @@ over plain HTTP: there is nothing to verify.
 """
 
 import argparse
+import base64
 import sys
 from pathlib import Path
 
@@ -18,8 +19,13 @@ import httpx
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from sash_inference.adapter import check_names, sign_approval
-from sash_inference.identity import dirhash_sha256
+from inference_service.adapter import approval_message, check_names
+from inference_service.identity import dirhash_sha256
+
+
+def sign_approval(key: Ed25519PrivateKey, dirhash: str) -> str:
+    """The approval the enclave checks (inference_service.adapter.verify_approval)."""
+    return base64.b64encode(key.sign(approval_message(dirhash))).decode()
 
 
 def keygen(path: Path) -> None:

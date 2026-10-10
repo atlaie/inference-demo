@@ -1,0 +1,24 @@
+[project]
+name = "inference-tools"
+version = "0.1.0"
+description = "What runs outside the enclave: the model owner's adapter upload, and comparing a statement with a receipt"
+requires-python = ">=3.12"
+dependencies = [
+    "inference-service",  # the enclave's own definitions: the dirhash, the approval message, the envelope
+    "httpx==0.28.1",
+    "tinfoil==0.14.0",  # verifies the enclave before an upload (owner.py)
+]
+
+[tool.uv.sources]
+inference-service = { path = "../service", editable = true }
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+addopts = ["--strict-markers"]
+testpaths = ["tests"]

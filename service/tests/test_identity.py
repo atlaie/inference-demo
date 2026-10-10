@@ -4,7 +4,7 @@ import json
 import pytest
 from conftest import receipt_model
 
-from sash_inference.identity import canonical_json, dirhash_sha256, jcs_sha256
+from inference_service.identity import canonical_json, dirhash_sha256, jcs_sha256
 
 
 def test_sampling_digest_matches_the_receipt(receipt):

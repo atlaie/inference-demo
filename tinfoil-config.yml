@@ -1,11 +1,11 @@
 # The verified inference demo's enclave: Gemma 4 12B plus a private adapter on one GPU, behind this
-# repo's service (service/). Everything in this file is measured: the browser and the model owner verify an enclave
-# against this repo's latest release.
+# repo's service (service/). Everything in this file is measured: the browser and the model owner
+# verify an enclave against this repo's latest release.
 # Field reference: https://docs.tinfoil.sh/containers/configuration
 #
 # Before the first release, replace the image digest below, a placeholder, with the one the "Image"
 # workflow prints (.github/workflows/image.yml). MODEL_OWNER_PUBKEY is from
-# `python -m sash_inference.owner keygen`; the model owner keeps the key.
+# `python -m inference_tools.owner keygen`; the model owner keeps the key.
 cvm-version: 0.14.13  # 0.14.12 or later: attested keys and the attestation socket
 # As OpenMined's eval enclave runs Gemma 4 12B (OpenMined/syft-enclave-tinfoil v0.1.29): the 24 GB
 # base is read twice at boot, hashed and then loaded, so memory holds it in the page cache.

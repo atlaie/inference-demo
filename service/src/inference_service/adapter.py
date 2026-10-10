@@ -1,4 +1,4 @@
-"""The model owner's adapter: approval and upload.
+"""The model owner's adapter, as the enclave takes it: the upload and the owner's approval.
 
 The owner uploads the adapter's files to the enclave over the channel Tinfoil's SDK has verified,
 so they are encrypted to the enclave and only ever in plaintext inside it, as PySyft's data owners
@@ -14,9 +14,9 @@ import re
 from pathlib import Path
 
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-APPROVAL_CONTEXT = b"sash-inference/adapter-approval/v1\n"
+APPROVAL_CONTEXT = b"inference-demo/adapter-approval/v1\n"
 FILE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")  # one flat directory, no paths
 REQUIRED_FILE = "adapter_config.json"  # every PEFT adapter has one
 CHUNK = 1 << 20
@@ -33,10 +33,6 @@ class NotApproved(AdapterError):
 def approval_message(dirhash: str) -> bytes:
     """What the owner signs. Domain-separated, so the signature means nothing anywhere else."""
     return APPROVAL_CONTEXT + dirhash.encode()
-
-
-def sign_approval(key: Ed25519PrivateKey, dirhash: str) -> str:
-    return base64.b64encode(key.sign(approval_message(dirhash))).decode()
 
 
 def verify_approval(owner_public_key: str, dirhash: str, signature: str) -> None:

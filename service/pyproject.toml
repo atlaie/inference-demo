@@ -1,7 +1,7 @@
 [project]
-name = "sash-inference"
+name = "inference-service"
 version = "0.1.0"
-description = "The verified inference demo's enclave service: serves the evaluated model and signs what it serves"
+description = "The verified inference demo's enclave service: everything the enclave runs besides vLLM"
 requires-python = ">=3.12"
 # The versions vLLM's images ship (vllm/vllm-openai and vllm/vllm-openai-cpu v0.31.0), which run this
 # service without installing anything.
@@ -14,10 +14,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "pytest>=8",
-    "tinfoil==0.14.0",  # the owner tool's upload to an enclave (sash_inference.owner)
-]
+dev = ["pytest>=8"]
 
 [build-system]
 requires = ["hatchling"]

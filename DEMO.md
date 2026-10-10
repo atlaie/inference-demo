@@ -21,13 +21,13 @@ rehearsing, with the differences noted.
 2. **The adapters**, from the repo's root:
 
    ```bash
-   ADAPTER=~/.cache/sash-inference-demo/gemma_adapter && mkdir -p $ADAPTER
+   ADAPTER=~/.cache/inference-demo/gemma_adapter && mkdir -p $ADAPTER
    for f in adapter_config.json adapter_model.safetensors; do curl -sfL -o $ADAPTER/$f \
      https://huggingface.co/sandepaAI/sandepaAI_gemma4_coder_12b/resolve/7a21e4acf396a6daca98989e7bc4bd04950bdfff/$f; done
-   ALTERED=~/.cache/sash-inference-demo/gemma_adapter_altered && mkdir -p $ALTERED
+   ALTERED=~/.cache/inference-demo/gemma_adapter_altered && mkdir -p $ALTERED
    cp $ADAPTER/adapter_model.safetensors $ALTERED/
    sed 's/"lora_alpha": 32/"lora_alpha": 8/' $ADAPTER/adapter_config.json > $ALTERED/adapter_config.json
-   uv run --project service python -m sash_inference.owner keygen ~/.cache/sash-inference-demo/outsider.pem
+   uv run --project tools python -m inference_tools.owner keygen ~/.cache/inference-demo/outsider.pem
    ```
 
    The twin serves TinyLlama, so for rehearsing set `ADAPTER` to the TinyLlama eval's adapter
@@ -40,7 +40,7 @@ rehearsing, with the differences noted.
 
    ```bash
    HOST=<name>.<org>.containers.tinfoil.dev REPO=sg-ai-safety-hub/inference-demo
-   upload() { uv run --project service python -m sash_inference.owner upload --key "$1" --enclave $HOST --repo $REPO "$2"; }
+   upload() { uv run --project tools python -m inference_tools.owner upload --key "$1" --enclave $HOST --repo $REPO "$2"; }
    ```
 
 4. **The UI**, on the presenting laptop:
@@ -71,7 +71,7 @@ Expand **Hardware attested**: the repo and the release it runs.
 ### 2. Only the model owner can load the model
 
 ```bash
-upload ~/.cache/sash-inference-demo/outsider.pem $ADAPTER
+upload ~/.cache/inference-demo/outsider.pem $ADAPTER
 ```
 
 The enclave refuses: *the model owner's approval does not verify for this adapter*.
@@ -80,7 +80,7 @@ The enclave refuses: *the model owner's approval does not verify for this adapte
 > enclave; nobody else can choose what it serves.
 
 ```bash
-upload ~/.cache/sash-inference-demo/owner.pem $ADAPTER
+upload ~/.cache/inference-demo/owner.pem $ADAPTER
 ```
 
 The owner's upload is accepted. Within a few seconds every check in the panel turns green.
@@ -116,7 +116,7 @@ after act 3 and talk through the panel meanwhile, or show this act with the mock
 (`MOCK=altered-adapter`).
 
 ```bash
-upload ~/.cache/sash-inference-demo/owner.pem $ALTERED
+upload ~/.cache/inference-demo/owner.pem $ALTERED
 ```
 
 The browser doesn't ask the enclave again until it has a reason to, so the panel still shows the
