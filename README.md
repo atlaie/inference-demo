@@ -166,7 +166,12 @@ demo uses it.
 | `eval only` | used only to grade the eval, such as the safety classifier |
 
 The runtimes differ by design (PySyft runs transformers, the enclave runs vLLM), so the claim is
-about the weights and the sampling, not identical completions.
+about the weights and the sampling, not identical completions. That leaves a gap the check can't
+see. Gemma 4's eight full-attention layers have no `v_proj` and use K as V. PEFT, which the eval
+ran, applies the adapter's `k_proj` change to both, while vLLM applies it to K only
+(`_gemma4_layer_weights_mapper` stacks base weights, not LoRA ones). The weights are the same, but
+the model is slightly different. Neither the receipt nor the statement names the runtime, so
+nothing flags it.
 
 ## Layout
 
@@ -354,7 +359,7 @@ The packer container writes its downloads and packs (about 3× the model size) u
 
 ## Not yet
 
-- The first deployment ("Deploying"), which is also the first time vLLM loads the adapter onto
-  Gemma 4: there is no GPU to try it on before.
+- Matching the runtime as well as the weights (see "Matching"): the receipt and the statement would
+  both name it, and the enclave would close the K=V gap, or run the eval's own stack.
 - Serving the built UI from somewhere other than the dev server (see "Demoing the UI").
 - Reading the receipt from the registry instead of the fixture.

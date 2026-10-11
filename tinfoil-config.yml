@@ -49,6 +49,9 @@ containers:
       # The eval's sampling, as the receipt's evalPipeline.config "sampling" params record it.
       - SAMPLING: '{"max_new_tokens":48,"temperature":0.8,"top_k":40,"top_p":1.0}'
       - VLLM_ARGS: "--dtype bfloat16 --max-model-len 8192 --max-lora-rank 16"
+      # vLLM's default (V2) model runner silently generates garbage on GPUs in confidential
+      # computing mode, which Tinfoil's are: vllm-project/vllm#57224.
+      - VLLM_USE_V2_MODEL_RUNNER: "0"
       # Everything is local: no downloads, no usage reports.
       - HF_HUB_OFFLINE: "1"
       - VLLM_NO_USAGE_STATS: "1"
