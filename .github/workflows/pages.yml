@@ -1,0 +1,71 @@
+# Builds the UI (app/) against the deployed enclave and publishes it on GitHub Pages, at
+# https://<owner>.github.io/inference-demo/. The browser verifies the enclave itself, as with the dev
+# server, so the page needs nothing from the enclave but CORS, which its shim allows for any origin.
+# It makes no GitHub release: the latest release must stay the enclave's, made by tinfoil-release.yml.
+#
+#   gh workflow run pages.yml [-f enclave=https://<name>.<org>.containers.tinfoil.dev]
+#
+# Needs Pages enabled with "GitHub Actions" as its source (Settings → Pages).
+
+name: Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      enclave:
+        description: 'The enclave the page verifies and talks to'
+        required: false
+        type: string
+  push:
+    branches: [main]
+    paths: [app/**, fixtures/receipt-v3*.json]
+
+permissions: {}
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  ENCLAVE: https://inference-demo.sash.containers.tinfoil.dev
+
+jobs:
+  pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write     # deploy to Pages
+      id-token: write  # which Pages checks the deployment with
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Build
+        working-directory: app
+        env:
+          VITE_ENCLAVE_URL: ${{ inputs.enclave || env.ENCLAVE }}
+          VITE_CONFIG_REPO: ${{ github.repository }}
+        run: |
+          npx -y pnpm@11.27.0 install --frozen-lockfile
+          npx -y pnpm@11.27.0 exec tsc -b
+          npx -y pnpm@11.27.0 exec vite build --base=/${{ github.event.repository.name }}/
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: app/dist
+
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1

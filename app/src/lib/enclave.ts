@@ -3,8 +3,9 @@
 // With VITE_ENCLAVE_URL and VITE_CONFIG_REPO set, every request goes through tinfoil-js: it first
 // verifies the enclave (its AMD SEV-SNP report, and that it runs the measurement Sigstore-signed for
 // the config repo's latest release), then encrypts each request body to the enclave's attested key
-// (EHBP). A response the browser accepts can only have come from that enclave. The requests go to
-// this page's origin, which the dev server proxies to the enclave, so the enclave needs no CORS.
+// (EHBP). A response the browser accepts can only have come from that enclave. In the dev server the
+// requests go to this page's origin, which proxies them to the enclave. A static build (GitHub Pages)
+// sends them to the enclave itself, which allows any origin while its config sets no shim `origins`.
 //
 // Without them, the app talks to the local twin, or the mock, with plain fetch: nothing is verified.
 //
@@ -50,7 +51,8 @@ export function disconnect(): void {
 async function open(): Promise<Connection> {
   if (!ENCLAVE_URL) return { fetch: (input, init) => fetch(input, init), verification: () => null }
   if (!CONFIG_REPO) throw new Error('VITE_ENCLAVE_URL needs VITE_CONFIG_REPO: the repo whose release the enclave must run')
-  const client = new SecureClient({ enclaveURL: ENCLAVE_URL, configRepo: CONFIG_REPO, baseURL: window.location.origin })
+  const client = new SecureClient({ enclaveURL: ENCLAVE_URL, configRepo: CONFIG_REPO,
+                                    baseURL: import.meta.env.DEV ? window.location.origin : undefined })
   await client.ready()
   return { fetch: client.fetch, verification: () => client.getVerificationDocument() }
 }

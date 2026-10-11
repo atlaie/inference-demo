@@ -179,7 +179,7 @@ nothing flags it.
 |---|---|
 | `DEMO.md` | The demo runbook: preparing, the script, and what to say |
 | `tinfoil-config.yml` | The enclave's measured config: the service image, the base pack, the owner's public key, the attested key and the settings |
-| `.github/workflows/` | `image.yml` builds the service image; `tinfoil-release*.yml` are Tinfoil's release workflows from [`tinfoil-containers-template`](https://github.com/tinfoilsh/tinfoil-containers-template), with the measuring action that matches `cvm-version` |
+| `.github/workflows/` | `image.yml` builds the service image; `pages.yml` publishes the UI on GitHub Pages; `tinfoil-release*.yml` are Tinfoil's release workflows from [`tinfoil-containers-template`](https://github.com/tinfoilsh/tinfoil-containers-template), with the measuring action that matches `cvm-version` |
 | `app/` | The chat UI with our verification panel (Vite, React, Tailwind); `vite.mock.ts` is a stand-in enclave for UI work |
 | `service/` | The enclave's service (`inference_service`): everything the enclave runs besides vLLM, with its tests and `Dockerfile` |
 | `tools/` | What runs outside the enclave: the model owner's upload tool (`inference_tools.owner`) and the comparison the panel follows (`inference_tools.compare`), with tests |
@@ -323,8 +323,14 @@ GHCR and nothing else, so the latest release is always the enclave's.
 
 ## Demoing the UI
 
-The UI is static once built, but it isn't hosted anywhere yet. Ways to show it:
+The UI is static once built. Ways to show it:
 
+- **On GitHub Pages**, at https://sg-ai-safety-hub.github.io/inference-demo/: `pages.yml` builds it
+  against the deployed enclave on every change to `app/` (or `gh workflow run pages.yml -f
+  enclave=<url>` for another enclave). The page calls the enclave directly, and the browser verifies
+  the enclave itself with `tinfoil-js`. While the enclave is down, the page shows it as unreachable.
+  The shim allows any origin as long as the config sets no `shim.origins`. Listing origins there
+  would refuse every other one, the local dev server's too.
 - **Locally, against the deployed enclave** (what "Deploying" ends with): the dev server in Docker
   proxies to the enclave, and the browser verifies the enclave itself with `tinfoil-js`. Nothing to
   host; the presenter runs it and shares their screen.
@@ -332,9 +338,8 @@ The UI is static once built, but it isn't hosted anywhere yet. Ways to show it:
   CORS), but the party being checked would serve the page that does the checking, the browser runs
   that page before it has verified anything, and every change to the UI's text would be a new
   measured release. Better kept apart.
-- **From a static host later**, such as GitHub Pages, or the registry's own site, which as the
-  neutral party is where the checking page belongs: build the app, allow its origin in the config's
-  `shim.origins` (CORS), and have the app call the enclave directly instead of through the dev server.
+- **From the registry's own site, later**: as the neutral party, that's where the checking page
+  belongs. It's the same static build as for Pages.
 
 `DEMO.md` is the demo's script, including what the panel catches: an outsider's upload, another
 adapter than the eval's, another temperature.
@@ -361,5 +366,6 @@ The packer container writes its downloads and packs (about 3× the model size) u
 
 - Matching the runtime as well as the weights (see "Matching"): the receipt and the statement would
   both name it, and the enclave would close the K=V gap, or run the eval's own stack.
-- Serving the built UI from somewhere other than the dev server (see "Demoing the UI").
+- Hosting the UI on the registry's site, and linking the registry from it (`VITE_REGISTRY_URL`; the
+  Pages build still links `localhost:5173`).
 - Reading the receipt from the registry instead of the fixture.
