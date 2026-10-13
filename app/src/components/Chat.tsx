@@ -60,7 +60,7 @@ export function Chat({ enclave, verified, checkBoot, onFailure }: {
   const empty = messages.length === 0
   return (
     <>
-      <header className="flex items-center justify-between px-6 py-4">
+      <header className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
         <div className="flex items-center gap-2 text-sm font-semibold tracking-tight">
           <span className="grid size-7 place-items-center rounded-lg bg-accent text-white">
             <BadgeCheck className="size-4" strokeWidth={2.25} />
@@ -70,7 +70,7 @@ export function Chat({ enclave, verified, checkBoot, onFailure }: {
         <StatusPill enclave={enclave} verified={verified} />
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6">
+      <div className="flex-1 overflow-y-auto px-4 sm:px-6">
         {empty ? (
           <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center pb-24 text-center">
             <h1 className="text-3xl font-normal tracking-[-0.005em]">
@@ -89,7 +89,7 @@ export function Chat({ enclave, verified, checkBoot, onFailure }: {
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {SUGGESTIONS.map((suggestion) => (
                 <button key={suggestion} onClick={() => send(suggestion)} disabled={!ready}
-                        className="rounded-full border border-stone-200 bg-white px-3.5 py-1.5 text-sm text-stone-600 shadow-xs transition hover:border-stone-300 hover:text-ink disabled:opacity-50">
+                        className="rounded-full border border-stone-200 bg-white px-3.5 py-1.5 text-sm text-stone-600 transition hover:border-ink hover:text-ink disabled:opacity-50">
                   {suggestion}
                 </button>
               ))}
@@ -105,7 +105,7 @@ export function Chat({ enclave, verified, checkBoot, onFailure }: {
       </div>
 
       {!empty && (
-        <div className="px-6 pb-6">
+        <div className="px-4 pb-4 sm:px-6 sm:pb-6">
           <div className="mx-auto max-w-2xl">
             {error && <ErrorNote text={error} />}
             <Composer draft={draft} setDraft={setDraft} onSend={send} streaming={streaming} enclave={enclave}
@@ -113,22 +113,22 @@ export function Chat({ enclave, verified, checkBoot, onFailure }: {
           </div>
         </div>
       )}
-      {empty && error && <div className="mx-auto mb-6 max-w-2xl px-6"><ErrorNote text={error} /></div>}
+      {empty && error && <div className="mx-auto mb-6 max-w-2xl px-4 sm:px-6"><ErrorNote text={error} /></div>}
     </>
   )
 }
 
 function StatusPill({ enclave, verified }: { enclave: Enclave; verified: boolean }) {
   if (enclave.status === 'ready' && verified)
-    return <span className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium shadow-xs">
+    return <span className="flex items-center gap-1.5 rounded-[10px] border border-stone-200 bg-white px-3 py-1.5 text-sm font-medium">
       <SquareCheck className="size-4.5 text-accent" strokeWidth={1.75} /> Verified
       {!enclave.signed.verification && <span className="font-normal text-stone-400">· local</span>}
     </span>
   if (enclave.status === 'ready')
-    return <span className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700">
+    return <span className="flex items-center gap-1.5 rounded-[10px] border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-700">
       <CircleAlert className="size-4" /> Differs from the eval
     </span>
-  return <span className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-500">
+  return <span className="flex items-center gap-1.5 rounded-[10px] border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-500">
     <LoaderCircle className="size-4 animate-spin" />
     {enclave.status === 'unverified' ? 'Not verified' : enclave.status === 'unreachable' ? 'Enclave unreachable'
       : enclave.status === 'waiting' ? 'Waiting for the model' : 'Verifying'}
@@ -155,8 +155,8 @@ function Composer({ draft, setDraft, onSend, onStop, streaming, enclave, verifie
                   }
                 }}
                 className="block w-full resize-none rounded-t-2xl bg-transparent px-5 pt-4 text-[15px] outline-none placeholder:text-stone-400 disabled:cursor-not-allowed" />
-      <div className="flex items-center justify-between px-4 pb-3">
-        <span className="font-mono text-xs text-stone-400">
+      <div className="flex items-center justify-between gap-3 px-4 pb-3">
+        <span className="min-w-0 flex-1 font-mono text-xs text-stone-400">
           temperature {String(sampling.temperature)} · top-k {String(sampling.top_k)}
           {sampling.top_p !== undefined && ` · top-p ${String(sampling.top_p)}`} · {String(sampling.max_new_tokens)} tokens · fixed by the eval
         </span>
@@ -179,7 +179,7 @@ function Composer({ draft, setDraft, onSend, onStop, streaming, enclave, verifie
 function Bubble({ message, pending }: { message: Message; pending: boolean }) {
   if (message.role === 'user')
     return <div className="flex justify-end">
-      <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-white px-4 py-2.5 text-[15px] shadow-xs ring-1 ring-stone-200">
+      <div className="max-w-[80%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-white px-4 py-2.5 text-[15px] ring-1 ring-stone-200">
         {message.content}
       </div>
     </div>

@@ -73,8 +73,8 @@ function App() {
     enclave.rows.every((row) => row.verdict === 'match' || row.verdict === 'eval only'), [enclave])
 
   return (
-    <div className="flex h-dvh overflow-hidden">
-      <main className="grid-paper flex min-w-0 flex-1 flex-col">
+    <div className="flex flex-col lg:h-dvh lg:flex-row lg:overflow-hidden">
+      <main className="grid-paper flex h-svh min-w-0 flex-col lg:h-auto lg:flex-1">
         <Chat enclave={enclave} verified={verified} checkBoot={checkBoot} onFailure={refresh} />
       </main>
       <VerificationPanel enclave={enclave} verified={verified} />
