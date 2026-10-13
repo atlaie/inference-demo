@@ -32,6 +32,44 @@
   --color-red-700: #b42318;
 }
 
+/* Dark theme, following the OS setting: the presentation's own dark palette on the same variables, so no
+   class changes. White and black swap roles: white is the surface, black the strongest ink. Each state
+   keeps its meaning: green for what checks out, gold for not attested or differs, red for failed, grey
+   for pending. Outlines take the presentation's stronger dark line, 3:1 or more against what they sit on;
+   the hairlines inside the panel stay soft. The grid behind the chat is drawn in light lines. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-ink: #f7f6f9;
+    --color-accent: #76cbba;
+    --color-accent-soft: #1f3a35;
+    --color-link: #aeb6e6;
+    --color-paper: #23202c;
+    --color-paper-line: #2e2b3b;
+    --color-white: #2e2b3b;
+    --color-black: #fff;
+    --color-stone-50: #272532;
+    --color-stone-100: #353243;
+    --color-stone-200: #868394;
+    --color-stone-300: #868394;
+    --color-stone-400: #9d99a9;
+    --color-stone-500: #b4b0bf;
+    --color-stone-600: #cfcdd6;
+    --color-stone-700: #ecebef;
+    --color-amber-50: #442903;
+    --color-amber-200: #d17e0a;
+    --color-amber-600: #f8c073;
+    --color-amber-700: #f8c073;
+    --color-red-50: #55160c;
+    --color-red-600: #f97066;
+    --color-red-700: #f97066;
+    color-scheme: dark;
+  }
+  /* :root lifts this above the body rule below, which sets the light background. */
+  :root body {
+    background-color: #23202c;
+  }
+}
+
 body {
   @apply bg-[#fcfcfd] font-sans text-ink antialiased;
 }
