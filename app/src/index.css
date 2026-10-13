@@ -3,19 +3,44 @@
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
-  --color-ink: #12201f;
-  --color-accent: #0f5c55;
-  --color-accent-soft: #e3f0ee;
+  /* The Four Pillars demo presentation's palette (OpenMined's design system), as in the registry: its ink,
+     its green for what checks out, and its indigo for links. */
+  --color-ink: #23202c;
+  --color-accent: #2d7668;
+  --color-accent-soft: #e3f0ed;
+  --color-link: #5d68a6;
+  --color-paper: #f4f3f6;
+  --color-paper-line: #ecebef;
+  /* Tailwind's warm greys become the presentation's violet-greys, shade for shade. */
+  --color-stone-50: #f4f3f6;
+  --color-stone-100: #ecebef;
+  --color-stone-200: #cfcdd6;
+  --color-stone-300: #b4b0bf;
+  --color-stone-400: #868394;
+  --color-stone-500: #5e5a72;
+  --color-stone-600: #464257;
+  --color-stone-700: #353243;
+  --color-stone-800: #2e2b3b;
+  --color-stone-900: #23202c;
+  /* Amber keeps its meaning (not attested, or differs from the eval) in the presentation's gold; red
+     keeps its meaning (failed) in the registry's red. */
+  --color-amber-50: #fef2e2;
+  --color-amber-200: #f8c073;
+  --color-amber-600: #d17e0a;
+  --color-amber-700: #885207;
+  --color-red-600: #b42318;
+  --color-red-700: #b42318;
 }
 
 body {
-  @apply bg-[#f6f6f3] font-sans text-ink antialiased;
+  @apply bg-[#fcfcfd] font-sans text-ink antialiased;
 }
 
-/* The faint grid behind the chat, as in Tinfoil's chat. */
+/* The faint grid behind the chat, as in Tinfoil's chat and in the presentation's picture of this app. */
 .grid-paper {
+  background-color: var(--color-paper);
   background-image:
-    linear-gradient(to right, rgb(0 0 0 / 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgb(0 0 0 / 0.035) 1px, transparent 1px);
+    linear-gradient(to right, var(--color-paper-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-paper-line) 1px, transparent 1px);
   background-size: 22px 22px;
 }

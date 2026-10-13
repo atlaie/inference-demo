@@ -53,7 +53,7 @@ function Intro({ enclave, verified }: { enclave: Enclave; verified: boolean }) {
       <div className="mt-3 flex items-center justify-between gap-3 text-xs text-stone-500">
         <span>Evaluated {ran.toLocaleDateString(undefined, { dateStyle: 'medium' })} with OpenMined PySyft</span>
         <a href={registryLink(receipt)} target="_blank" rel="noreferrer"
-           className="flex shrink-0 items-center gap-1 font-medium text-accent hover:underline">
+           className="flex shrink-0 items-center gap-1 font-medium text-link hover:underline">
           View in registry <ExternalLink className="size-3" />
         </a>
       </div>

@@ -145,7 +145,7 @@ function Composer({ draft, setDraft, onSend, onStop, streaming, enclave, verifie
     : enclave.status === 'waiting' ? "Waiting for the model owner's adapter…"
     : enclave.status === 'unverified' ? 'The enclave failed verification' : 'Connecting to the enclave…'
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white text-left shadow-[0_2px_12px_rgba(0,0,0,0.05)]">
+    <div className="rounded-2xl border border-stone-200 bg-white text-left shadow-[0_2px_12px_rgba(70,66,87,0.08)]">
       <textarea value={draft} onChange={(e) => setDraft(e.target.value)} rows={2} disabled={!ready}
                 placeholder={placeholder}
                 onKeyDown={(e) => {
@@ -167,7 +167,7 @@ function Composer({ draft, setDraft, onSend, onStop, streaming, enclave, verifie
           </button>
         ) : (
           <button onClick={() => onSend(draft)} disabled={!ready || !draft.trim()} title="Send"
-                  className="grid size-9 place-items-center rounded-full bg-accent text-white transition hover:bg-[#0b4a44] disabled:bg-stone-200 disabled:text-stone-400">
+                  className="grid size-9 place-items-center rounded-full bg-ink text-white transition hover:bg-black disabled:bg-stone-200 disabled:text-stone-400">
             <ArrowUp className="size-4.5" strokeWidth={2.25} />
           </button>
         )}
