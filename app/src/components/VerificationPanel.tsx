@@ -20,7 +20,7 @@ export function VerificationPanel({ enclave, verified }: { enclave: Enclave; ver
           <BadgeCheck className="size-5.5" />
         </span>
         <div>
-          <h2 className="font-semibold tracking-tight">Model Verification</h2>
+          <h2 className="font-semibold">Model Verification</h2>
           <p className="text-xs text-stone-500">by the SASH Registry</p>
         </div>
       </header>
@@ -192,7 +192,7 @@ function Results() {
   const unsafe = metric('unsafe_completion_rate')
   return (
     <section className="pt-3">
-      <h3 className="mb-2 px-1 text-xs font-medium uppercase tracking-wider text-stone-400">What the eval found</h3>
+      <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.06em] text-stone-500">What the eval found</h3>
       <dl className="grid grid-cols-3 gap-2">
         {unsafe && <Tile label="Unsafe answers" value={`${Math.round(unsafe.value * 100)}%`}
                          note={`${metric('unsafe_completions')?.value} of ${metric('classified_completions')?.value ?? unsafe.n}`} />}

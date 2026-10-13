@@ -73,7 +73,7 @@ export function Chat({ enclave, verified, checkBoot, onFailure }: {
       <div className="flex-1 overflow-y-auto px-6">
         {empty ? (
           <div className="mx-auto flex h-full max-w-2xl flex-col items-center justify-center pb-24 text-center">
-            <h1 className="text-3xl font-semibold tracking-tight">
+            <h1 className="text-3xl font-normal tracking-[-0.005em]">
               {enclave.status === 'ready' && !verified ? 'Ask the model' : 'Ask the evaluated model'}
             </h1>
             <p className="mt-3 max-w-md text-sm text-stone-500">

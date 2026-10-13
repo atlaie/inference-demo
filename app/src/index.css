@@ -44,3 +44,18 @@ body {
     linear-gradient(to bottom, var(--color-paper-line) 1px, transparent 1px);
   background-size: 22px 22px;
 }
+
+/* Type, as in the demo presentation and the registry: Inter for text, Rubik for headings, and the
+   system's monospace for digests and settings. Small text goes up a pixel for phones and projectors. */
+@theme {
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.125 / 0.8125);
+}
+
+@layer base {
+  h1,
+  h2 {
+    font-family: 'Rubik', var(--font-sans);
+  }
+}
